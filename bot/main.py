@@ -8,7 +8,7 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
 from sheet_write import write_registration
-from sheet_read import read_sheet_values, normalize_data
+from sheet_read import read_sheet_values, normalize_data, get_data_from_id
 from auth import get_credentials
 from bot import buttons, states
 
@@ -71,7 +71,8 @@ async def process_region(message: types.Message, state: FSMContext):
     write_registration("Пользователи!A:E", ls)
     await message.answer(
         text="Перед Вами ближайшие матчи, можете ознакомиться с более подробной информацией (список участников и др)")
-    data_values = read_sheet_values(get_credentials())
+    keys = ["id", "date", "weekday", "address", "time"]
+    data_values = read_sheet_values(table_name="Расписание!A1:G", keys=keys)
     for index, text in enumerate(normalize_data(data_values)):
         await message.answer(
             text=text,
@@ -82,16 +83,43 @@ async def process_region(message: types.Message, state: FSMContext):
     await state.finish()
 
 
+def get_final_body_content(key_id):
+    keys = ["id", "date", "weekday", "address", "time"]
+    date_address = normalize_data(
+        get_data_from_id(
+            id=key_id,
+            table_name="Расписание!A1:G",
+            keys=keys,
+            key="id"
+        )
+    )[0] + "\n\n"
+    match_keys = ["match_id", "team", "user_id", "fullname", "username", "phone", "pay"]
+    full_detail = get_data_from_id(id=key_id, table_name="Матчи!A1:G", keys=match_keys, key="match_id")
+    payed_users = ''
+    reserve_users = ''
+    index = 1
+    index2 = 1
+    for user in full_detail:
+        print(user.get("pay"))
+        if user.get("pay") == "+":
+            payed_users += "%s. %sn\n" % (str(index), user.get("fullname"))
+            index += 1
+        if user.get("pay") != "+":
+            reserve_users += "%s. %sn\n" % (str(index2), user.get("fullname"))
+            index2 += 1
+    payload = "Osnova na igru:\n%s\n\nReserve:\n%s" % (payed_users, reserve_users)
+    return date_address + payload
+
+
 @dp.callback_query_handler(lambda c: c.data.startswith('Example:'))
 async def process_callback_button(callback_query: types.CallbackQuery):
     data_parts = callback_query.data.split(':')
-    if len(data_parts) == 2:
-        key_id = data_parts[1]
-        await bot.send_message(callback_query.from_user.id, f"ID ключа: {key_id}")
-        await callback_query.answer('Кнопка нажата')
-    else:
-        await callback_query.answer('Ошибка обработки данных')
+    key_id = data_parts[-1]
+    await bot.send_message(
+        callback_query.from_user.id,
+        get_final_body_content(key_id),
+        reply_markup=buttons.register_buttons
+    )
 
 
-if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+executor.start_polling(dp, skip_updates=True)
