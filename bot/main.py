@@ -1,15 +1,13 @@
-import logging
-import os
 from datetime import datetime
 from dotenv import load_dotenv
-import pytz
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
+import pytz, sqlite3, os, logging
+
 from sheet_write import write_registration
 from sheet_read import read_sheet_values, normalize_data, get_data_from_id
-from auth import get_credentials
 from bot import buttons, states
 
 # Configure logging
@@ -25,10 +23,23 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 
+def is_registered(user: dict, tg_id: int):
+    return any(str(id.get("id")) == str(tg_id) for id in user)
+
+
 @dp.message_handler(Command("start"))
 async def start_command(message: types.Message):
-    await message.answer("Здравствуйте, для регистрации введите Фамилия и Имя (пример: Ордабаев Куралбек)")
-    await states.UserDetails.full_name.set()
+    user_id = read_sheet_values(table_name="Пользователи!B:B", keys=["id"])
+    print(user_id)
+    if is_registered(user_id, tg_id=message.from_user.id):
+        await message.answer(
+            f"Здравствйте {message.from_user.username}, Рад вас снова видеть. Вы можете "
+            f"записываться на игру и принимать участие в футбольных турнирах",
+            reply_markup=buttons.two_buttons)
+
+    else:
+        await message.answer("Здравствуйте, для регистрации введите Фамилия и Имя (пример: Ордабаев Куралбек)")
+        await states.UserDetails.full_name.set()
 
 
 @dp.message_handler(state=states.UserDetails.full_name)
@@ -70,44 +81,28 @@ async def process_region(message: types.Message, state: FSMContext):
     ls = [days_hours, user_id, full_name, "https://t.me/" + str(username), phone_number, region]
     write_registration("Пользователи!A:E", ls)
     await message.answer(
-        text="Перед Вами ближайшие матчи, можете ознакомиться с более подробной информацией (список участников и др)")
-    keys = ["id", "date", "weekday", "address", "time"]
-    data_values = read_sheet_values(table_name="Расписание!A1:G", keys=keys)
-    for index, text in enumerate(normalize_data(data_values)):
-        await message.answer(
-            text=text,
-            reply_markup=buttons.InlineKeyboardMarkup().add(
-                buttons.InlineKeyboardButton(text="Подробнее", callback_data=f"Example:{data_values[index]['id']}")
-            )
-        )
+        text="Спасибо за регистрацию в “Газон” Теперь вы можете записываться на игру "
+             "и принимать участие в футбольных турнирах",
+        reply_markup=buttons.two_buttons
+    )
+
     await state.finish()
 
 
 def get_final_body_content(key_id):
     keys = ["id", "date", "weekday", "address", "time"]
-    date_address = normalize_data(
-        get_data_from_id(
-            id=key_id,
-            table_name="Расписание!A1:G",
-            keys=keys,
-            key="id"
-        )
-    )[0] + "\n\n"
+    data1 = get_data_from_id(id=key_id, table_name="Расписание!A1:G", keys=keys, key="id")
+    date_address = normalize_data(data1)[0] + "\n\n"
+
     match_keys = ["match_id", "team", "user_id", "fullname", "username", "phone", "pay"]
-    full_detail = get_data_from_id(id=key_id, table_name="Матчи!A1:G", keys=match_keys, key="match_id")
-    payed_users = ''
-    reserve_users = ''
-    index = 1
-    index2 = 1
-    for user in full_detail:
-        print(user.get("pay"))
-        if user.get("pay") == "+":
-            payed_users += "%s. %sn\n" % (str(index), user.get("fullname"))
-            index += 1
-        if user.get("pay") != "+":
-            reserve_users += "%s. %sn\n" % (str(index2), user.get("fullname"))
-            index2 += 1
-    payload = "Osnova na igru:\n%s\n\nReserve:\n%s" % (payed_users, reserve_users)
+    data2 = get_data_from_id(id=key_id, table_name="Матчи!A1:G", keys=match_keys, key="match_id")
+
+    payed_users = '\n'.join(
+        [f"{index}. {user.get('fullname')}" for index, user in enumerate(data2, start=1) if user.get("pay") == "+"])
+    reserve_users = '\n'.join(
+        [f"{index}. {user.get('fullname')}" for index, user in enumerate(data2, start=1) if user.get("pay") != "+"])
+
+    payload = f"Команда:\n{payed_users}\n\nReserve:\n{reserve_users}"
     return date_address + payload
 
 
@@ -122,4 +117,96 @@ async def process_callback_button(callback_query: types.CallbackQuery):
     )
 
 
-executor.start_polling(dp, skip_updates=True)
+@dp.callback_query_handler(lambda c: c.data.startswith('go_back'))
+async def go_back_button(callback_query: types.CallbackQuery):
+    keys = ["id", "date", "weekday", "address", "time"]
+    data_values = read_sheet_values(table_name="Расписание!A1:G", keys=keys)
+    for index, text in enumerate(normalize_data(data_values)):
+        await bot.send_message(
+            callback_query.from_user.id,
+            text=text,
+            reply_markup=buttons.InlineKeyboardMarkup().add(
+                buttons.InlineKeyboardButton(
+                    text="Просмотреть",
+                    callback_data=f"Example:{data_values[index]['id']}"
+                )
+            )
+        )
+
+
+@dp.message_handler()
+async def basic_message(message: types.Message):
+    if message.text == "Записаться на игру":
+        await message.answer(
+            text="Перед Вами ближайшие матчи, можете ознакомиться "
+                 "с более подробной информацией (список участников и др)")
+        keys = ["id", "date", "weekday", "address", "time"]
+        data_values = read_sheet_values(table_name="Расписание!A1:G", keys=keys)
+        for index, text in enumerate(normalize_data(data_values)):
+            await message.answer(
+                text=text,
+                reply_markup=buttons.InlineKeyboardMarkup().add(
+                    buttons.InlineKeyboardButton(
+                        text="Посмотреть",
+                        callback_data=f"Example:{data_values[index]['id']}"
+                    )
+                )
+            )
+    elif message.text == "Моя команда":
+        match_keys = ["match_id", "team", "user_id", "fullname", "username", "phone", "pay"]
+        keys = ["id", "date", "weekday", "address", "time"]
+        try:
+            match_id = get_data_from_id(
+                id=str(message.from_user.id),
+                table_name="Матчи!A:G",
+                keys=match_keys,
+                key="user_id"
+            )[0].get("match_id")
+            team = get_data_from_id(
+                id=match_id,
+                table_name="Расписание!A:G",
+                keys=keys,
+                key="id"
+            )
+            await message.answer(text=normalize_data(team)[0])
+        except IndexError:
+            await message.answer("You have not joined any team yet, let's join one!")
+    else:
+        await message.answer("Message isn't recognized!")
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith('play_button'))
+async def message(callback: types.CallbackQuery):
+    match_keys = ["match_id", "team", "user_id", "fullname", "username", "phone", "pay"]
+    matches = read_sheet_values(table_name="Матчи!A:G", keys=match_keys)
+
+    def is_joined_to_match():
+        for match in matches:
+            if str(callback.from_user.id) in match.values():
+                return True
+
+        return False
+
+    if is_joined_to_match():
+        await bot.send_message(chat_id=callback.from_user.id, text="You have already in match!")
+    else:
+        user = get_data_from_id(
+            id=str(callback.from_user.id),
+            table_name="Пользователи!A:G",
+            keys=["date", "user_id", "fullname", "username", "phone", "region"],
+            key="user_id"
+        )[0]
+        del user["region"], user["date"]
+        write_registration(
+            range_name="Матчи!A:G",
+            list_of_values=[1] + list(user.values())  # Will be updated to match id or something
+        )
+        await bot.send_message(
+            chat_id=callback.from_user.id,
+            text="You are added to team as a reserve player\nJust after payment you will be offered to a game"
+
+        )
+
+
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True)

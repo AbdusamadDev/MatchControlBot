@@ -20,9 +20,7 @@ def write_registration(range_name: str, list_of_values: list):
         # Вызываем Sheets API
         sheet = service.spreadsheets()
         values = [list_of_values]
-        body = {
-            'values': values
-        }
+        body = {'values': values}
         sheet.values().append(
             spreadsheetId=SPREADSHEET_ID,
             range=range_name,
