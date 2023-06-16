@@ -5,5 +5,5 @@ class UserDetails(StatesGroup):
     full_name = State()
     phone_number = State()
     region = State()
-
+    match_id = State()
 

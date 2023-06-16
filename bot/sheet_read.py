@@ -5,14 +5,12 @@ from typing import Iterable
 from auth import get_credentials
 
 SPREADSHEET_ID = '1EuqtYAOY3mhgjbOSljBEKcuj46NJU1jBRYymaWD_So4'
-# RANGE_TABLE = 'Расписание!A1:G'
-RANGE_MATCHS = 'Матчи!A1:G'
 
 
 def read_sheet_values(table_name, keys):
     """Читает значения из таблицы."""
     try:
-        service = build('sheets', 'v4', credentials=credentials)
+        service = build('sheets', 'v4', credentials=get_credentials())
         sheet = service.spreadsheets()
         result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=table_name).execute()
         values = result.get('values')
@@ -28,6 +26,7 @@ def read_sheet_values(table_name, keys):
 
 def get_data_from_id(id: str, table_name: str, keys: list, key: str):
     list_of_values = read_sheet_values(table_name=table_name, keys=keys)
+    print(list_of_values)
     final_result = [value for value in list_of_values if value.get(key) == id]
     return final_result
 
@@ -43,7 +42,6 @@ def normalize_data(data_value):
             list_of_buttons.append(per_button_text)
 
     return list_of_buttons
-
 
 #
 # def read_sheet_values1(table_name):
@@ -87,4 +85,4 @@ def normalize_data(data_value):
 #     return list_of_buttons
 
 
-credentials = get_credentials()  # Получение учетных данных (предполагается, что у вас есть функция get_credentials())
+# credentials = get_credentials()  # Получение учетных данных (предполагается, что у вас есть функция get_credentials())

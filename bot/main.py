@@ -86,7 +86,7 @@ async def process_region(message: types.Message, state: FSMContext):
         reply_markup=buttons.two_buttons
     )
 
-    await state.finish()
+    # await state.finish()
 
 
 def get_final_body_content(key_id):
@@ -107,9 +107,10 @@ def get_final_body_content(key_id):
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('Example:'))
-async def process_callback_button(callback_query: types.CallbackQuery):
+async def process_callback_button(callback_query: types.CallbackQuery, state: FSMContext):
     data_parts = callback_query.data.split(':')
     key_id = data_parts[-1]
+    await state.update_data(match_id=int(key_id))
     await bot.send_message(
         callback_query.from_user.id,
         get_final_body_content(key_id),
@@ -176,15 +177,25 @@ async def basic_message(message: types.Message):
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('play_button'))
-async def message(callback: types.CallbackQuery):
+async def message(callback: types.CallbackQuery, state: FSMContext):
     match_keys = ["match_id", "team", "user_id", "fullname", "username", "phone", "pay"]
-    matches = read_sheet_values(table_name="Матчи!A:G", keys=match_keys)
+    match_state = await state.get_data()
+    match_id = match_state.get("match_id")
+    print(match_id)
+    matches = get_data_from_id(
+        id=match_id,
+        table_name="Матчи!A:G",
+        keys=match_keys,
+        key="match_id"
+    )
+    print(matches)
 
     def is_joined_to_match():
+        if not matches:
+            return False
         for match in matches:
             if str(callback.from_user.id) in match.values():
                 return True
-
         return False
 
     if is_joined_to_match():
