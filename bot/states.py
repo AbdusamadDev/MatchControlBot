@@ -6,5 +6,9 @@ class UserDetails(StatesGroup):
     phone_number = State()
     region = State()
     match_id = State()
-# moy kommand
-#
+
+
+class PaymentDetails(StatesGroup):
+    card_id = State()
+    CSV = State()
+    expire_date = State()

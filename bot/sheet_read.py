@@ -8,14 +8,13 @@ SPREADSHEET_ID = '1EuqtYAOY3mhgjbOSljBEKcuj46NJU1jBRYymaWD_So4'
 
 
 def read_sheet_values(table_name, keys):
-    """Читает значения из таблицы."""
+
     try:
         service = build('sheets', 'v4', credentials=get_credentials())
         sheet = service.spreadsheets()
         result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=table_name).execute()
         values = result.get('values')
 
-        # Преобразование в словарь
         data = [dict(zip(keys, row)) for row in values[1:]]
 
         return data
@@ -37,7 +36,7 @@ def normalize_data(data_value):
         return list_of_buttons
     for data in data_value:
         if len(data) >= 5:
-            per_button_text = "%s (%s) %s\nгде: %s" % (
+            per_button_text = "%s (%s) %s\nГде: %s" % (
                 data.get("date"), data.get("weekday"), data.get("time"), data.get("address"))
             list_of_buttons.append(per_button_text)
 

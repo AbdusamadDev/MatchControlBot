@@ -2,15 +2,12 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from auth import get_credentials
 
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-
 SPREADSHEET_ID = '1EuqtYAOY3mhgjbOSljBEKcuj46NJU1jBRYymaWD_So4'
-RANGE_NAME = 'Пользователи!A:E'
 
 
-def write_registration(range_name: str, list_of_values: list):
+def update_registration(range_name: str, row_index: int, list_of_values: list):
     """Пример использования Sheets API.
-    Записывает данные в таблицу.
+    Обновляет данные в таблице для указанной строки.
     """
     try:
         service = build('sheets', 'v4', credentials=get_credentials())
@@ -19,17 +16,13 @@ def write_registration(range_name: str, list_of_values: list):
         sheet = service.spreadsheets()
         values = [list_of_values]
         body = {'values': values}
-        sheet.values().append(
+        sheet.values().update(
             spreadsheetId=SPREADSHEET_ID,
-            range=range_name,
+            range=f'{range_name}!H{row_index}:H{row_index}',
             valueInputOption='RAW',
-            body=body,
-            insertDataOption='INSERT_ROWS',
+            body=body
         ).execute()
-        return 'Данные успешно записаны в таблицу.'
+        return 'Данные успешно обновлены в таблице.'
     except HttpError as err:
         return str(err)
 
-#
-# if __name__ == '__main__':
-#     update_registration("Пользователи", row_index=2, list_of_values=["qweqwe"])
