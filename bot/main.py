@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-import time
+# import time
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -11,10 +11,11 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
 
-from sheet_delete import unix, delete_expired, delete
-from bot import buttons, states
+from sheet_delete import unix, delete_expired, delete, subtract_from_current_date
+from bot import buttons, states, database
 from sheet_read import get_data_from_id, normalize_data, read_sheet_values
 from sheet_write import write_registration
+from sheet_update import update_registration
 
 logging.basicConfig(level=logging.INFO)
 load_dotenv()
@@ -39,75 +40,182 @@ def is_registered(user: dict, tg_id: int):
 # ------------------------------------------------------------------------------------------------ Oplatit igru button
 @dp.callback_query_handler(lambda c: c.data.startswith('pay_game'))
 async def pay_game(callback_query: types.CallbackQuery, state: FSMContext):
+    match_id = (await state.get_data()).get("match_id")
     await callback_query.message.delete()
+    match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
+    date_keys = ["match_id", "data", "address", "date", "time", "max"]
+    dates = get_data_from_id(
+        table_name="Расписание!A1:G",
+        id=str(match_id),
+        keys=date_keys,
+        key="match_id"
+    )[0]
+    matches = get_data_from_id(
+        id=str(match_id),
+        table_name="Матчи!A:G",
+        keys=match_keys,
+        key="match_id"
+    )
+    match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
+    # print("Max player: ", int(dates.get("max")))
+    # print("Match ID: ", match_id)
+    # print("len matches ", len(matches))
+    if int(dates.get("max")) > len(matches):
+
+        team_user = get_data_from_id(
+            id=str(callback_query.from_user.id),
+            table_name="Матчи!A:I",
+            keys=match_keys,
+            key="user_id"
+        )
+
+        def is_payed():
+            return any(str(k.get("match_id")) == str(match_id) and k.get("pay") == "+" for k in team_user)
+
+        if not is_payed():
+            await bot.send_message(
+                callback_query.from_user.id,
+                text="Выбор формата оплаты",
+                reply_markup=buttons.per_or_team_button
+            )
+        else:
+            await bot.send_message(callback_query.from_user.id, "Вы уже заплатили за игру")
+    else:
+        await bot.send_message(callback_query.from_user.id, text="You cannot play in this game because game is full!")
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith('only_me'))
+async def only_me(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(team_or_one="me")
+    await bot.send_message(callback.from_user.id, "You selected only me. Please enter your Card ID:")
+    await states.PaymentDetails.card_id.set()
+    # print("State data: ", await state.get_data())
+
+
+@dp.message_handler(state=states.PaymentAmounts.team_or_one)
+@dp.callback_query_handler(lambda c: c.data.startswith('for_team'))
+async def for_team(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(team_or_one="team")
+    await bot.send_message(callback.from_user.id, "You selected for team. Please enter your Card ID:")
+    await states.PaymentDetails.card_id.set()
+    # print("State data: ", await state.get_data())
+
+
+@dp.message_handler(state=states.PaymentDetails.card_id)
+async def get_card_id(message: types.Message, state: FSMContext):
+    await state.update_data(card_id=message.text)
+    await message.answer("Card CVV/CVC")
+    await states.PaymentDetails.CSV.set()
+    # print("State data: ", await state.get_data())
+
+
+@dp.message_handler(state=states.PaymentDetails.CSV)
+async def get_csv(message: types.Message, state: FSMContext):
+    await state.update_data(CSV=message.text)
+    await message.answer("Card Expire date:")
+    await states.PaymentDetails.expire_date.set()
+    # print("State data: ", await state.get_data())
+
+
+# --------------------------------------------------------------------------------------------------------- change team
+# @dp.message_handler()
+@dp.callback_query_handler(lambda c: c.data.startswith('change_team'))
+async def change_team(callback: types.CallbackQuery, state: FSMContext):
+    # Добавляем обновленные данные состояния, если необходимо
+    # await state.update_data(match_id=int(key_id))
+    base = database.Model()
+    keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
+    key = await state.get_data()
+    data = base.get(user_id=callback.from_user.id)
+    # if data is not None:
+    database.Model(user_id=int(callback.from_user.id), chance=int(data) + 1).update()
+    data_values = read_sheet_values(
+        table_name="Расписание!A1:G",
+        keys=["match_id", "date", "weekday", "address", "time", "max"]
+    )
+    match_id = (await state.get_data()).get("match_id")
+    # print("Match ID: ", match_id)
+    for index, some_data in enumerate(
+            read_sheet_values(
+                table_name="Матчи!A:J",
+                keys=keys
+            )
+    ):
+        # print(some_data)
+        if some_data.get("user_id") == str(callback.from_user.id) and some_data.get("match_id") == str(match_id):
+            # print("Mother hackin is ready to go")
+            # print("This is index: ", index)
+            delete("Матчи", row_number=index + 2)
+    b_list = []
+
+    for index, text in enumerate(normalize_data(data_values)):
+        b_list.append(
+            buttons.InlineKeyboardButton(
+                text=f"{index + 1}. {text}",
+                callback_data=f"Example:{data_values[index]['match_id']}"
+            )
+        )
+    b = buttons.InlineKeyboardMarkup(row_width=1).add(*b_list)
     await bot.send_message(
-        callback_query.from_user.id,
-        text="Выбор формата оплаты",
-        reply_markup=buttons.per_or_team_button
+        callback.from_user.id,
+        text="Перед Вами ближайшие матчи.\nВы можете ознакомиться "
+             "с более подробной информацией, такой как список участников и другое.",
+        reply_markup=b
     )
 
-    match_id = (await state.get_data()).get("match_id")
-    match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
 
-    team_user = get_data_from_id(
-        id=str(callback_query.from_user.id),
-        table_name="Матчи!A:I",
+def get_discount():
+    keys = ["regular_user", "new_user", "triple_games"]
+    discounts = read_sheet_values(table_name="Цены", keys=keys)
+    return discounts
+
+
+# -------------------------------------------------------------------------------------------------------
+@dp.message_handler(state=states.PaymentDetails.expire_date)
+async def get_expiry(message: types.Message, state: FSMContext):
+    await state.update_data(expire_date=message.text)
+    match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
+    state_data = await state.get_data()
+    money_to_pay = 0
+    regular_user = get_data_from_id(
+        table_name="Матчи!A:G",
+        id=str(message.from_user.id),
         keys=match_keys,
         key="user_id"
     )
 
-    def is_payed():
-        return any(str(k.get("match_id")) == str(match_id) and k.get("pay") == "+" for k in team_user)
+    def is_regular():
+        for k in regular_user:
+            if subtract_from_current_date(k.get("date")) > 15:
+                return False
+        return True
 
-    if not is_payed():
-        message = callback_query.message.text.split("\n")[0]
-        day = message[:8]
-        hour = message[-5:]
-        print(day, hour)
-        match = get_data_from_id(
-            id=day,
-            table_name="Расписание!A1:G",
-            keys=["id", "date", "weekday", "address", "time"],
-            key="date"
-        )
-        print(match)
-        d = next((i.get("id") for i in match if i.get("time") == hour), None)
-
-        await bot.send_message(callback_query.from_user.id, text="Чтобы оплатить матч. Введите данные")
-        await bot.send_message(callback_query.from_user.id, "Введите номер карты")
-        await states.PaymentDetails.card_id.set()
+    # print(is_regular())
+    # print(get_discount())
+    if int(state_data.get("amount_of_game")) == 3:
+        money_to_pay = int(get_discount()[0].get("triple_games")) * 3
+    elif is_regular():
+        money_to_pay = int(get_discount()[0].get("regular_user"))
     else:
-        await bot.send_message(callback_query.from_user.id, "Вы уже заплатили за игру")
-
-
-@dp.message_handler(state=states.PaymentDetails.card_id)
-async def card_id(message: types.Message, state: FSMContext):
-    await message.answer("Введите срок действия карты")
-    await state.update_data(card_id=message.text)
-    await states.PaymentDetails.CSV.set()
-
-
-@dp.message_handler(state=states.PaymentDetails.CSV)
-async def csv(message: types.Message, state: FSMContext):
-    await message.answer("Введите имя держателя карты")
-    await state.update_data(CSV=message.text)
-    await states.PaymentDetails.expire_date.set()
-
-
-@dp.message_handler(state=states.PaymentDetails.expire_date)
-async def expiry(message: types.Message, state: FSMContext):
-    await state.update_data(expire_date=message.text)
-    time.sleep(2)
-    match_id = await state.get_data()
-    match_id = match_id.get("match_id")
-    match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
-    await message.answer("Оплата прошла успешно")
-    print(await state.get_data())
-
-    date_keys = ["match_id", "data", "address", "date", "time"]
+        money_to_pay = int(get_discount()[0].get("new_user"))
+    # Here, you should implement the payment processing using the card details stored in the state.
+    # And if the payment is successful, store the 3 bounces in the database.
+    # date_keys = ["match_id", "data", "address", "date", "time", "max"]
+    user = get_data_from_id(
+        id=str(message.from_user.id),
+        table_name="Пользователи!A:G",
+        keys=["date", "user_id", "fullname", "username", "phone", "region"],
+        key="user_id"
+    )[0]
+    del user["region"], user["date"]
+    matches = read_sheet_values(
+        table_name="Матчи!A:G",
+        keys=match_keys,
+    )
+    date_keys = ["match_id", "data", "address", "date", "time", "max"]
     dates = get_data_from_id(
-        table_name="Расписание!A1:F",
-        id=str(match_id),
+        table_name="Расписание!A1:G",
+        id=str(state_data.get("match_id")),
         keys=date_keys,
         key="match_id"
     )[0]
@@ -119,30 +227,94 @@ async def expiry(message: types.Message, state: FSMContext):
     )[0]
     del user["region"], user["date"]
     rem = list(user.values())
-    rem.append("+")
-    final_data = list([dates.get("data"), dates.get("time"), dates.get("match_id")]) + rem
-    matches = get_data_from_id(
-        id=str(match_id),
-        table_name="Матчи!A:G",
-        keys=match_keys,
-        key="match_id"
+    final_data = list([dates.get("data"), dates.get("time"), dates.get("match_id")]) + rem + ["+"]
+
+    def user_exists():
+        for j in matches:
+            if j.get("user_id") == str(message.from_user.id) and j.get("match_id") == str(state_data.get("match_id")):
+                return True
+
+    # print(user_exists())
+    if user_exists():
+        for index, i in enumerate(matches):
+            if str(i.get("match_id")) == str(state_data.get("match_id")) and str(i.get("user_id")) == str(
+                    message.from_user.id):
+                # print("Condition worked")
+                update_registration(range_name="Матчи", sign="+", row_index=index + 2)
+    else:
+        # print(">>> ", final_data)
+        write_registration("Матчи!A:G", list_of_values=final_data)
+    if state_data.get("team_or_one") == "team":
+        players_count = get_data_from_id(
+            id=str(state_data.get("match_id")),
+            table_name="Матчи!A:I",
+            keys=match_keys,
+            key="match_id"
+        )
+        # print(len(players_count))
+        # print(players_count)
+        team_max = get_data_from_id(
+            id=str(state_data.get("match_id")),
+            table_name="Расписание!A:G",
+            keys=date_keys,
+            key="match_id"
+        )[0].get("max")
+        # print(state_data.get("match_id"))
+        # print("Team Max ", team_max)
+
+        if int(state_data.get("amount_of_game")) == 1:
+            money_to_pay += (2500 * ((int(team_max) - len(players_count)) + 1))
+        else:
+            money_to_pay += 3 * (2500 * ((int(team_max) - len(players_count)) + 1))
+    elif state_data.get("team_or_one") == "me":
+        if int(state_data.get("amount_of_game")) == 1:
+            money_to_pay += 2500
+        else:
+            money_to_pay += 3 * 2500
+    # print("Amount of money: ", money_to_pay)
+    # print(database.Model().get_user(int(message.from_user.id)))
+    if database.Model().get_user(int(message.from_user.id)) is None:
+        print("Data is None")
+        data = database.Model(
+            user_id=int(message.from_user.id),
+            chance=int(state_data.get("amount_of_game")) - 1
+        )
+        data.save()
+    else:
+        # print(state_data)
+        data = database.Model(
+            user_id=int(message.from_user.id),
+            chance=int(state_data.get("amount_of_game")) - 1
+        )
+        data.update()
+    await message.answer("Your payment is successful!")
+    await message.answer(get_final_body_content(state_data.get("match_id")), reply_markup=buttons.change_team1)
+    await state.finish()
+    await state.update_data(match_id=state_data.get("match_id"))
+
+
+@dp.message_handler(state=states.PaymentAmounts.amount_of_game)
+@dp.callback_query_handler(lambda c: c.data.startswith('per'))
+async def per_game(callback: types.CallbackQuery, state: FSMContext):
+    amount = 2500
+    await state.update_data(amount_of_game=1)
+    await bot.send_message(
+        callback.from_user.id,
+        text="2500 from you. Please choose how many games you want?",
+        reply_markup=buttons.who_button
     )
 
-    write_registration(
-        range_name="Матчи!A:G",
-        list_of_values=final_data
-    )
-    await bot.send_chat_action(message.from_user.id, "typing")
-    await asyncio.sleep(2)
-    await bot.send_message(chat_id=message.from_user.id, text="Вы записались на игру!")
-    # else:
-    #     await bot.send_message(chat_id=message.from_user.id, text="You have already joined to team!")
+
+@dp.message_handler(state=states.PaymentAmounts.amount_of_game)
+@dp.callback_query_handler(lambda c: c.data.startswith('three'))
+async def three_games(callback: types.CallbackQuery, state: FSMContext):
+    amount = 5100
+    await state.update_data(amount_of_game=3)
     await bot.send_message(
-        chat_id=message.from_user.id,
-        text=get_final_body_content(match_id),
-        reply_markup=buttons.absence(match_id)
+        callback.from_user.id,
+        text="5100 from you. Please choose how many games you want?",
+        reply_markup=buttons.who_button
     )
-    await state.finish()
 
 
 # ------------------------------------------------------------------------------------------------ Starting the bot
@@ -224,7 +396,7 @@ def get_final_body_content(key_id):
 
     match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
     data2 = get_data_from_id(id=str(key_id), table_name="Матчи!A1:I", keys=match_keys, key="match_id")
-    print(data2)
+    # print(data2)
 
     payed_users = ""
     for index, user in enumerate(data2, start=1):
@@ -248,13 +420,24 @@ async def process_callback_button(callback_query: types.CallbackQuery, state: FS
 
     # Добавляем обновленные данные состояния, если необходимо
     await state.update_data(match_id=int(key_id))
-
+    base = database.Model()
+    data = base.get(user_id=int(callback_query.from_user.id))
+    is_payed = not ((data is None) or (int(data) == 0))
+    # print(data, is_payed)
     # Отправляем новое сообщение с обновленной информацией
-    await bot.send_message(
-        callback_query.from_user.id,
-        get_final_body_content(key_id),
-        reply_markup=buttons.register_buttons
-    )
+    if is_payed:
+        # print("Is payed equals to True")
+        await bot.send_message(
+            callback_query.from_user.id,
+            get_final_body_content(key_id),
+            reply_markup=buttons.payed_button
+        )
+    else:
+        await bot.send_message(
+            callback_query.from_user.id,
+            get_final_body_content(key_id),
+            reply_markup=buttons.register_buttons
+        )
 
 
 # ------------------------------------------------------------------------------------------------ go back button
@@ -300,9 +483,11 @@ async def basic_message(message: types.Message):
                 )
             )
         b = buttons.InlineKeyboardMarkup(row_width=1).add(*b_list)
-        await message.answer(text="Перед Вами ближайшие матчи.\nВы можете ознакомиться "
-                                  "с более подробной информацией, такой как список участников и другое.",
-                             reply_markup=b)
+        await message.answer(
+            text="Перед Вами ближайшие матчи.\nВы можете ознакомиться "
+                 "с более подробной информацией, такой как список участников и другое.",
+            reply_markup=b
+        )
     elif message.text == "Моя команда":
         team_user = get_data_from_id(
             id=str(message.from_user.id),
@@ -330,11 +515,11 @@ async def delete_absent_user(callback: types.CallbackQuery):
     keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
     match_id = callback.data.split(":")[-1]
     user = read_sheet_values(table_name="Матчи!A1:I", keys=keys)
-    print(user, match_id)
+    # print(user, match_id)
     for index, i in enumerate(user):
-        print(i.get("user_id"), i.get("match_id"))
+        # print(i.get("user_id"), i.get("match_id"))
         if i.get("user_id") == str(callback.from_user.id) and i.get("match_id") == str(match_id):
-            print("-----------------------------------------------------")
+            # print("-----------------------------------------------------")
             print(delete(sheet_name="Матчи", row_number=index + 2))
     await bot.send_message(callback.from_user.id, text="Choose where to join", )
     data_values = read_sheet_values(table_name="Расписание!A1:G", keys=ras_keys)
@@ -348,6 +533,8 @@ async def delete_absent_user(callback: types.CallbackQuery):
             )
         )
     b = buttons.InlineKeyboardMarkup(row_width=1).add(*b_list)
+    chance = database.Model().get(int(callback.from_user.id))
+    database.Model(user_id=int(callback.from_user.id), chance=int(chance + 1)).update()
     await bot.send_message(
         chat_id=callback.from_user.id,
         text="Перед Вами ближайшие матчи.\nВы можете ознакомиться "
@@ -356,8 +543,45 @@ async def delete_absent_user(callback: types.CallbackQuery):
     )
 
 
+# ------------------------------------------------------------------------------------------------ Play button
+
+@dp.callback_query_handler(lambda c: c.data == 'play')
+async def play(callback: types.CallbackQuery, state: FSMContext):
+    await bot.delete_message(chat_id=callback.from_user.id, message_id=callback.message.message_id)
+    chance = database.Model().get(user_id=int(callback.from_user.id))
+    database.Model(chance=int(chance) - 1, user_id=int(callback.from_user.id)).update()
+    state_data = await state.get_data()
+    # Here, you should implement the payment processing using the card details stored in the state.
+    # And if the payment is successful, store the 3 bounces in the database.
+    user = get_data_from_id(
+        id=str(callback.from_user.id),
+        table_name="Пользователи!A:G",
+        keys=["date", "user_id", "fullname", "username", "phone", "region"],
+        key="user_id"
+    )[0]
+    del user["region"], user["date"]
+    date_keys = ["match_id", "data", "address", "date", "time", "max"]
+    dates = get_data_from_id(
+        table_name="Расписание!A1:G",
+        id=str(state_data.get("match_id")),
+        keys=date_keys,
+        key="match_id"
+    )[0]
+    user = get_data_from_id(
+        id=str(callback.from_user.id),
+        table_name="Пользователи!A:G",
+        keys=["date", "user_id", "fullname", "username", "phone", "region"],
+        key="user_id"
+    )[0]
+    del user["region"], user["date"]
+    rem = list(user.values())
+    final_data = list([dates.get("data"), dates.get("time"), dates.get("match_id")]) + rem + ["+"]
+    write_registration(range_name="Матчи", list_of_values=final_data)
+    await bot.send_message(callback.from_user.id, "Your balance decreased")
+
+
 # ------------------------------------------------------------------------------------------------ Xochu igrat button
-@dp.callback_query_handler(lambda c: c.data.startswith('play_button'))
+@dp.callback_query_handler(lambda c: c.data == 'play_button')
 async def message1(callback: types.CallbackQuery, state: FSMContext):
     match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
     match_state = await state.get_data()
@@ -396,7 +620,7 @@ async def message1(callback: types.CallbackQuery, state: FSMContext):
             return False
 
         if not is_joined():
-            if int(dates.get("max")) < len(matches):
+            if int(dates.get("max")) > len(matches):
                 write_registration(
                     range_name="Матчи!A:G",
                     list_of_values=final_data
@@ -410,7 +634,8 @@ async def message1(callback: types.CallbackQuery, state: FSMContext):
             await bot.send_message(chat_id=callback.from_user.id, text="Вы уже вступили в команду!")
         await bot.send_message(
             chat_id=callback.from_user.id,
-            text=get_final_body_content(match_id)
+            text=get_final_body_content(match_id),
+            reply_markup=buttons.change_team
         )
     except IndexError as error:
         await bot.send_chat_action(callback.from_user.id, "typing")

@@ -58,6 +58,14 @@ def unix(date, time):
     return current_unix_time - unix_timestamp
 
 
+def subtract_from_current_date(date_str):
+    deadline = datetime.strptime(date_str, "%d.%m.%y")
+    current_date = datetime.now().date()
+
+    difference = current_date - deadline.date()
+    return int(difference.days)
+
+
 def delete_expired(table, keys):
     data = read_sheet_values(table, keys)
     # try:
@@ -69,10 +77,10 @@ def delete_expired(table, keys):
             print(delete(table.split("!")[0], row_number=row_index))
         else:
             row_index += 1
-    # except Exception:
-    #     print(data)
 
 
 if __name__ == '__main__':
-    mkeys = ["match_id", "date", "weekday", "address", "time"]
-    delete_expired("Расписание!A1:G", keys=mkeys)
+    # mkeys = ["match_id", "date", "weekday", "address", "time"]
+    # delete_expired("Расписание!A1:G", keys=mkeys)
+    # Example usage
+    print(subtract_from_current_date("10.06.23"))  # Subtract "29.06.23" from the current date

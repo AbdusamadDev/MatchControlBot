@@ -19,7 +19,7 @@ class Model:
         self.kwargs = kwargs
 
     def perform_assert(self):
-        assert "user_id" in self.kwargs.keys() and "chance" in self.kwargs.values(), ValueError(
+        assert "user_id" in self.kwargs.keys() and "chance" in self.kwargs.keys(), ValueError(
             """
                 Required values are not specified or set improperly
             """
@@ -37,18 +37,29 @@ class Model:
     def update(self):
         self.perform_assert()
         self.cursor.execute(
-            """UPDATE table_name SET chance=? WHERE user_id=?;""",
-            tuple(self.kwargs.values())
+            """UPDATE users SET chance=? WHERE user_id=?;""",
+            (self.kwargs['chance'], self.kwargs['user_id'])
         )
         self.connection.commit()
         return True
 
     def get(self, user_id: int):
-        user = self.cursor.execute("""SELECT user_id, chance WHERE user_id=?""", (user_id,)).fetchall()[0]
-        return user
+        user = self.cursor.execute(
+            """SELECT chance FROM users WHERE user_id=?""",
+            (user_id,)
+        ).fetchall()
+        if not user:
+            return None
+        return user[0][0]
+
+    def get_user(self, user_id):
+        user = self.cursor.execute("""SELECT user_id FROM users WHERE user_id=?""", (user_id,)).fetchall()
+        if user:
+            return user[0][0]
+        return None
 
 
 if __name__ == '__main__':
-    m = Model(user_id=55, chance=88)
+    m = Model(user_id=5122119678, chance=88)
     # print(tuple(m.kwargs))
-    print(m.save())
+    print(m.update())

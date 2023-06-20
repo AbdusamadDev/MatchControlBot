@@ -5,7 +5,9 @@ from auth import get_credentials
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 SPREADSHEET_ID = '1EuqtYAOY3mhgjbOSljBEKcuj46NJU1jBRYymaWD_So4'
-RANGE_NAME = 'Пользователи!A:E'
+
+
+# RANGE_NAME = 'Пользователи!A:E'
 
 
 def write_registration(range_name: str, list_of_values: list):
@@ -30,6 +32,14 @@ def write_registration(range_name: str, list_of_values: list):
     except HttpError as err:
         return str(err)
 
+
 #
-# if __name__ == '__main__':
-#     update_registration("Пользователи", row_index=2, list_of_values=["qweqwe"])
+if __name__ == '__main__':
+    for i in range(30):
+        write_registration(
+            "Матчи!A:J",
+            list_of_values=[
+                '28.06.23', '16:00', '4', '5122119678', 'ABDUSAMAD', 'https://t.me/ocean_devel', '+998940055565', '+'
+            ]
+        )
+

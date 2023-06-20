@@ -12,3 +12,8 @@ class PaymentDetails(StatesGroup):
     card_id = State()
     CSV = State()
     expire_date = State()
+
+
+class PaymentAmounts(StatesGroup):
+    amount_of_game = State()
+    team_or_one = State()

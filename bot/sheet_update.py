@@ -5,7 +5,7 @@ from auth import get_credentials
 SPREADSHEET_ID = '1EuqtYAOY3mhgjbOSljBEKcuj46NJU1jBRYymaWD_So4'
 
 
-def update_registration(range_name: str, row_index: int, list_of_values: list):
+def update_registration(range_name: str, row_index: int, sign: str):
     """Пример использования Sheets API.
     Обновляет данные в таблице для указанной строки.
     """
@@ -14,7 +14,7 @@ def update_registration(range_name: str, row_index: int, list_of_values: list):
 
         # Вызываем Sheets API
         sheet = service.spreadsheets()
-        values = [list_of_values]
+        values = [[sign]]
         body = {'values': values}
         sheet.values().update(
             spreadsheetId=SPREADSHEET_ID,
@@ -25,4 +25,3 @@ def update_registration(range_name: str, row_index: int, list_of_values: list):
         return 'Данные успешно обновлены в таблице.'
     except HttpError as err:
         return str(err)
-
