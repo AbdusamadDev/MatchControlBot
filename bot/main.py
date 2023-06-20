@@ -613,7 +613,7 @@ async def message1(callback: types.CallbackQuery, state: FSMContext):
 
         def is_joined():
             for i in matches:
-                print(i)
+                # print(i)
                 if i.get("user_id") == str(callback.from_user.id):
                     return True
 
