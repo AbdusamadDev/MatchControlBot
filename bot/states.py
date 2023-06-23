@@ -16,4 +16,4 @@ class PaymentDetails(StatesGroup):
 
 class PaymentAmounts(StatesGroup):
     amount_of_game = State()
-    team_or_one = State()
+    # team_or_one = State()

@@ -35,7 +35,7 @@ def normalize_data(data_value):
         return list_of_buttons
     for data in data_value:
         if len(data) >= 5:
-            per_button_text = "%s (%s) %s\nГде: %s" % (
+            per_button_text = "%s (%s) %s Где: %s\n" % (
                 data.get("date"), data.get("weekday"), data.get("time"), data.get("address"))
             list_of_buttons.append(per_button_text)
 
