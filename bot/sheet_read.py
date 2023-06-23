@@ -8,18 +8,14 @@ SPREADSHEET_ID = '1EuqtYAOY3mhgjbOSljBEKcuj46NJU1jBRYymaWD_So4'
 
 
 def read_sheet_values(table_name, keys):
-    try:
-        service = build('sheets', 'v4', credentials=get_credentials())
-        sheet = service.spreadsheets()
-        result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=table_name).execute()
-        values = result.get('values')
+    service = build('sheets', 'v4', credentials=get_credentials())
+    sheet = service.spreadsheets()
+    result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=table_name).execute()
+    values = result.get('values')
 
-        data = [dict(zip(keys, row)) for row in values[1:]]
+    data = [dict(zip(keys, row)) for row in values[1:]]
 
-        return data
-    except HttpError as err:
-        print(f"Ошибка при чтении таблицы: {err}")
-        return []
+    return data
 
 
 def get_data_from_id(id: str, table_name: str, keys: list, key: str):

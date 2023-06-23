@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import os
 from datetime import datetime
 
@@ -16,16 +15,11 @@ from sheet_read import get_data_from_id, normalize_data, read_sheet_values
 from sheet_write import write_registration
 from sheet_update import update_registration
 
-logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 # 🚫 ✅ ℹ️ ❓
-
-# Load environment variables
 token = os.getenv("TOKEN")
 bot = Bot(token=token)
-
-# Initialize bot and dispatcher
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
@@ -98,7 +92,6 @@ async def get_card_id(message: types.Message, state: FSMContext):
     await state.update_data(card_id=message.text)
     await message.answer("❓ Введите карту CVV/CVC:")
     await states.PaymentDetails.CSV.set()
-    # print("State data: ", await state.get_data())
 
 
 @dp.message_handler(state=states.PaymentDetails.CSV)
@@ -106,7 +99,6 @@ async def get_csv(message: types.Message, state: FSMContext):
     await state.update_data(CSV=message.text)
     await message.answer("❓ Введите срок действия карты:")
     await states.PaymentDetails.expire_date.set()
-    # print("State data: ", await state.get_data())
 
 
 # --------------------------------------------------------------------------------------------------------- change team
@@ -168,7 +160,6 @@ async def get_expiry(message: types.Message, state: FSMContext):
         keys=match_keys,
         key="user_id"
     )
-    print(regular_user)
 
     def is_regular():
         if not regular_user:
@@ -178,7 +169,6 @@ async def get_expiry(message: types.Message, state: FSMContext):
                 return False
         return True
 
-    print(is_regular())
     money_to_pay = 0
     if int(state_data.get("amount_of_game")) == 1:
         if is_regular():
@@ -192,7 +182,6 @@ async def get_expiry(message: types.Message, state: FSMContext):
             money_to_pay = int(get_discount()[0].get("new_user")) * 3
     # Here, you should implement the payment processing using the card details stored in the state.
     # And if the payment is successful, store the 3 bounces in the database.
-    # date_keys = ["match_id", "data", "address", "date", "time", "max"]
     user = get_data_from_id(
         id=str(message.from_user.id),
         table_name="Пользователи!A:G",
@@ -236,7 +225,6 @@ async def get_expiry(message: types.Message, state: FSMContext):
 
     await message.answer(str(money_to_pay))
     if database.Model().get_user(int(message.from_user.id)) is None:
-        print("Data is None")
         data = database.Model(
             user_id=int(message.from_user.id),
             chance=int(state_data.get("amount_of_game")) - 1
@@ -276,7 +264,6 @@ async def three_games(callback: types.CallbackQuery, state: FSMContext):
     await states.PaymentDetails.card_id.set()
 
 
-# ------------------------------------------------------------------------------------------------ Starting the bot
 @dp.message_handler(Command("start"))
 async def start_command(message: types.Message):
     user_id = read_sheet_values(table_name="Пользователи!B:B", keys=["id"])
@@ -352,7 +339,6 @@ def get_final_body_content(key_id):
 
     match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
     data2 = get_data_from_id(id=str(key_id), table_name="Матчи!A1:I", keys=match_keys, key="match_id")
-    # print(data2)
 
     payed_users = ""
     for index, user in enumerate(data2, start=1):
@@ -456,10 +442,7 @@ async def basic_message(message: types.Message):
         if not match_id_list:
             await message.answer("ℹ️ Вы еще не присоединились ни к одной команде, давайте сделаем одну")
         for per_id in match_id_list:
-            try:
-                await message.answer(get_final_body_content(per_id), reply_markup=buttons.change_team(per_id))
-            except IndexError:
-                print(match_id_list)
+            await message.answer(get_final_body_content(per_id), reply_markup=buttons.change_team(per_id))
 
 
 # ------------------------------------------------------------------------------------------------ cancel button
@@ -471,7 +454,7 @@ async def delete_absent_user(callback: types.CallbackQuery):
     user = read_sheet_values(table_name="Матчи!A1:I", keys=keys)
     for index, i in enumerate(user):
         if i.get("user_id") == str(callback.from_user.id) and i.get("match_id") == str(match_id):
-            print(delete(sheet_name="Матчи", row_number=index + 2))
+            delete(sheet_name="Матчи", row_number=index + 2)
     await bot.send_message(callback.from_user.id, text="Выберите, где присоединиться", )
     data_values = read_sheet_values(table_name="Расписание!A1:G", keys=ras_keys)
     b_list = []
