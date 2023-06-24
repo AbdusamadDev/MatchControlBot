@@ -1,7 +1,9 @@
+# coding=utf-8
 import asyncio
 import os
 from datetime import datetime
 
+from aiogram.dispatcher import filters
 from dotenv import load_dotenv
 import pytz
 from aiogram import Bot, Dispatcher, types, executor
@@ -10,18 +12,125 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
 
 from sheet_delete import unix, delete_expired, delete, subtract_from_current_date
-from bot import buttons, states, database
+import buttons
+import states
+import database
 from sheet_read import get_data_from_id, normalize_data, read_sheet_values
 from sheet_write import write_registration
 from sheet_update import update_registration
 
 load_dotenv()
 
+mess = """
+⚠️⚠️⚠️
+
+<b><b>Правила игры
+Матчи проводятся по смешанным правилами футбола и мини-футбола, дополненными согласно настоящему положению:</b></b>
+
+
+
+ℹ️ <b>1. Число игроков</b>
+
+
+    • В случае травмы или отсутствия игрока, его может заменить любой другой игрок;
+    
+    • В составе команды на поле выходят количество команд в соответствии формату 5х5, 6х6, 7х7 или 8х8
+
+
+    Минимум -1 человек от формата на поле от команды 
+    4 при 5х5, 5 при 6х6 и т.д.
+
+
+    • Количество замен, производимых командой во время матча, неограниченно. Разрешены обратные замены;
+
+    • Вратарь может поменяться местами с любым игроком своей команды.
+
+ℹ️ <b>2. Экипировка игроков</b>
+
+    • Игрок не должен использовать такую экипировку или носить то, что представляет опасность для него самого или для другого игрока (включая ювелирные изделия любого вида);
+
+    • Основной обязательной экипировкой игрока являются: манишка, футболка с рукавами, трусы, гетры, обувь (спортивная обувь с гладкой подошвой, либо бутсы-сороконжки);
+
+    • Бутсы с шипами запрещены.
+
+
+ℹ️ <b>3. Продолжительность игры</b>
+
+
+    Игры на вылет:
+	 <b>по 6 или 7 мин тайм</b>
+    Игры 1 на 1: 
+	<b>2 тайма по 26 минут</b>
+
+
+    • Перерыв между таймами не должен превышать 5 минут
+
+    • Контроль игрового времени осуществляется админом поля
+
+
+ℹ️ <b>4. Решение спорных моментов</b>
+
+Решение спорных моментов на поле осуществляется капитанами команд.
+
+
+    • В случае пенальти во время матча, убедиться, что видео с нарушением было записано (если нет, то решение принятое на поле, остаётся финальным)
+
+    • Тех пор идёт со счётом 3:0.
+
+
+ℹ️ <b>5. Правила игры на поле</b>
+Каждый игрок самостоятельно несёт отвественность за своё здоровье
+
+
+    • Гол не может быть засчитан непосредственно с начального удара;
+
+    • Положение «вне игры» не фиксируется;
+
+    • Пенальти бьется с расстояния в 9 метров (ворота 5х2), 7 метров ворота (3х2);
+
+    • Уход мяча за поле фиксируется в момент полного пересечения всего мяча линии. Пока его даже малая часть остаётся на линии - он в поле;
+
+    • Вратарь вводит мяч в игру ударом по неподвижному мячу с поля из пределов штрафной площади. На ввод мяча вратарю дается 6 секунд;
+
+    • Вратарь не может брать в руки пас от своего игрока, исключением является рикошет. Если всё же так случилось, то команда соперника пробивает свободный удар с линии штрафной;
+
+    • Аут вводится ударом ноги по неподвижному мячу с боковой линии. Если мяч после ввода из аута попал в ворота, не коснувшись никого из игроков, то гол не засчитывается;
+
+    • На ввод мяч из аута, со штрафного/свободного или углового удара команде дается 6 секунд. При этом игроки соперника должны располагаться не ближе 5 метров от мяча;
+
+    • Игрокам запрещается использование подкатов в попытке сыграть в мяч, когда им играет или пытается сыграть соперник. За подкат без нарушения назначается свободный удар;
+
+    • Не допускается преднамеренное воспрепятствие действиям вратаря (без мяча);
+
+    • Нельзя вступать в контактную борьбу с вратарём (без мяча);
+
+    • Запрещено удерживать мяч и играть лёжа;
+
+    • Замена игрока запрещена через линию, вдоль которой стоят ворота.
+
+
+ℹ️ <b>6. Особые случаи</b>
+
+    • При возникновении ситуаций с выкриками с угрозой расправы, нанесения телесных травм или иной формулировкой, которая является угрозой жизни и здоровью игрока, будет выдаваться прямая дисквалификация от 2 до 10 матчей. Без возвращения средств;
+
+    • При появлении побоев или нанесении телесных травм, в результате явной грубости, во время матча или на территории спортивных объектов до или после матча. Игрок может получить пожизненную дисквалификацию, а его команда техническое поражение в матче, в день которого это произошло. В плоть до снятия команды с турнира, в случае массовой драки и угроз. Без возвращения средств.
+
+<i>Организаторы турнира оставляют за собой право решение спорных моментов не прописанных в правилах сообщества и не попадающим под правила футбола и мини-футбола.</i>
+
+👤 Artiom Kiseliov
+📅 31 марта, 19:32"""
+
 # 🚫 ✅ ℹ️ ❓
 token = os.getenv("TOKEN")
 bot = Bot(token=token)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
+print("Bot started successfully")
+
+
+@dp.message_handler(commands=["test"])
+async def button_url(message: types.Message):
+    await message.answer("somethin", reply_markup=buttons.btn)
 
 
 def is_correct_text(text):
@@ -109,6 +218,8 @@ async def change_team(callback: types.CallbackQuery, state: FSMContext):
     keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
     ras_keys = ["id", "date", "weekday", "address", "time", "max"]
     data = base.get(user_id=callback.from_user.id)
+    if data is None:
+        data = 0
     if data > 0:
         database.Model(user_id=int(callback.from_user.id), chance=int(data) + 1).update()
     match_id = (await state.get_data()).get("match_id")
@@ -266,6 +377,7 @@ async def three_games(callback: types.CallbackQuery, state: FSMContext):
 
 @dp.message_handler(Command("start"))
 async def start_command(message: types.Message):
+    print(message.chat.id)
     user_id = read_sheet_values(table_name="Пользователи!B:B", keys=["id"])
     if is_registered(user_id, tg_id=message.from_user.id):
         await message.answer(
@@ -359,22 +471,103 @@ async def process_callback_button(callback_query: types.CallbackQuery, state: FS
     await callback_query.message.delete()
     data_parts = callback_query.data.split(':')
     key_id = data_parts[-1]
+    match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
+
+    def is_regular_user():
+        match = get_data_from_id(
+            table_name="Матчи!A:I",
+            id=str(callback_query.from_user.id),
+            keys=match_keys,
+            key="user_id"
+        )
+        return len(match) > 0
+
+    def is_joined_before():
+        match = get_data_from_id(
+            id=str(callback_query.from_user.id),
+            table_name="Матчи!A:I",
+            keys=match_keys,
+            key="user_id"
+        )
+        if not match:
+            return False
+        for i in match:
+            if i.get("match_id") == key_id:
+                return True
+        return False
 
     await state.update_data(match_id=int(key_id))
+
+    if is_regular_user():
+        base = database.Model()
+        data = base.get(user_id=int(callback_query.from_user.id))
+        is_payed = not ((data is None) or (int(data) == 0))
+        if not is_joined_before():
+            if is_payed:
+                await bot.send_message(
+                    callback_query.from_user.id,
+                    get_final_body_content(key_id),
+                    reply_markup=buttons.payed_button
+                )
+            else:
+                await bot.send_message(
+                    callback_query.from_user.id,
+                    get_final_body_content(key_id),
+                    reply_markup=buttons.register_buttons
+                )
+        else:
+            await bot.send_message(
+                callback_query.from_user.id,
+                get_final_body_content(key_id),
+                reply_markup=buttons.change_team(key_id)
+            )
+    else:
+        await bot.send_message(
+            callback_query.from_user.id, mess, parse_mode="HTML", reply_markup=buttons.btn
+        )
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("rule"))
+async def rules(callback_query: types.CallbackQuery, state: FSMContext):
     base = database.Model()
+    key = await state.get_data()
+    key_id = key.get("match_id")
     data = base.get(user_id=int(callback_query.from_user.id))
     is_payed = not ((data is None) or (int(data) == 0))
-    if is_payed:
-        await bot.send_message(
-            callback_query.from_user.id,
-            get_final_body_content(key_id),
-            reply_markup=buttons.payed_button
+    match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
+
+    def is_joined_before():
+        match = get_data_from_id(
+            id=str(callback_query.from_user.id),
+            table_name="Матчи!A:I",
+            keys=match_keys,
+            key="user_id"
         )
+        if not match:
+            return False
+        for i in match:
+            if i.get("match_id") == key_id:
+                return True
+        return False
+
+    if is_joined_before():
+        if is_payed:
+            await bot.send_message(
+                callback_query.from_user.id,
+                get_final_body_content(key_id),
+                reply_markup=buttons.payed_button
+            )
+        else:
+            await bot.send_message(
+                callback_query.from_user.id,
+                get_final_body_content(key_id),
+                reply_markup=buttons.register_buttons
+            )
     else:
         await bot.send_message(
             callback_query.from_user.id,
             get_final_body_content(key_id),
-            reply_markup=buttons.register_buttons
+            reply_markup=buttons.change_team(key_id)
         )
 
 

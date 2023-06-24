@@ -1,0 +1,205 @@
+
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex">
+
+    <link rel="icon" type="image/svg+xml" href="/Merchant/favicon.svg">
+    <title>Page Not Found</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+        }
+
+            body > div {
+                width: 400px;
+                margin: 0 auto;
+                /*background: lightgray;*/
+                position: relative;
+                height: 100%;
+            }
+
+        h1 {
+            font-style: normal;
+            font-weight: 300;
+            font-size: 64px;
+            line-height: normal;
+            text-align: center;
+            color: #263238;
+            position: absolute;
+            left: 20px;
+            top: 219px;
+            margin: 0;
+            z-index: 1;
+        }
+
+        p {
+            margin-top: -60px;
+            font-style: normal;
+            font-weight: 300;
+            font-size: 24px;
+            line-height: normal;
+            text-align: center;
+            color: #263238;
+            position: relative;
+            z-index: 1;
+        }
+
+        img {
+            z-index: 0;
+            transform: translate(20px, -20px);
+            position: relative;
+        }
+
+        body > div > a {
+            width: 300px;
+            height: 60px;
+            cursor: pointer;
+            /* R-Blue */
+            background: #1976D2;
+            border-radius: 0px 0px 2px 2px;
+            font-style: normal;
+            font-weight: 500;
+            font-size: 18px;
+            line-height: 25px;
+            text-align: center;
+            color: #FFFFFF;
+            display: block;
+            text-decoration: none;
+            line-height: 60px;
+            margin: 0 auto 20px auto;
+            position: relative;
+            z-index: 1;
+        }
+
+            body > div > a.disabled {
+                background: rgba(69, 90, 100, 0.15);
+                pointer-events: none;
+                color: #263238;
+                line-height: 28px;
+            }
+
+        body div div {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+        }
+
+        svg {
+            display: block;
+            margin: 0 auto 50px auto;
+        }
+
+        body div div a {
+            font-weight: normal;
+            font-size: 13px;
+            line-height: normal;
+            text-align: center;
+            text-decoration-line: underline;
+            color: #1976D2;
+            margin: 0 10px 50px 10px;
+            display: inline-block;
+        }
+
+        @media screen and (max-width: 480px) {
+            body div div {
+                position: fixed;
+                width: 400px;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h1>500</h1>
+
+        <picture>
+            <source srcset="/Merchant/errors/err.webp" type="image/webp">
+            <img src="/Merchant/errors/oooops.gif" alt="">
+        </picture>
+
+        <!--<img src="~/oooops.webp" alt="" />-->
+        <p>I in incomprehensible situation&#x2026;</p>
+
+        <a id="backButton" onclick="goBack()">Trying to return</a>
+        <!--<a id="googleButton" onclick="google()">Гуглю</a>-->
+        <a id="marketButton" onclick="goToMarket()">Go shopping</a>
+
+        <div>
+            <svg width="178" height="27" viewBox="0 0 178 27" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M125.28 5.40039C121.254 5.40039 117.72 8.66469 117.72 12.6904V21.6004H120.96V18.3604H129.6V21.6004H132.84V12.6904C132.84 8.66469 129.306 5.40039 125.28 5.40039ZM129.6 15.1204H120.96V12.6904C120.96 10.4548 123.044 8.64039 125.28 8.64039C127.516 8.64039 129.6 10.4548 129.6 12.6904V15.1204Z" fill="#FF5722" />
+                <path d="M170.1 5.40039C166.074 5.40039 162.54 8.66469 162.54 12.6904V21.6004H165.78V18.3604H174.42V21.6004H177.66V12.6904C177.66 8.66469 174.126 5.40039 170.1 5.40039ZM174.42 15.1204H165.78V12.6904C165.78 10.4548 167.864 8.64039 170.1 8.64039C172.336 8.64039 174.42 10.4548 174.42 12.6904V15.1204Z" fill="#FF5722" />
+                <path d="M92.34 5.40039C90.1917 5.40039 88.1315 6.25378 86.6124 7.77282C85.0934 9.29187 84.24 11.3521 84.24 13.5004C84.24 15.6486 85.0934 17.7089 86.6124 19.228C88.1315 20.747 90.1917 21.6004 92.34 21.6004C94.4882 21.6004 96.5485 20.747 98.0676 19.228C99.5866 17.7089 100.44 15.6486 100.44 13.5004C100.44 11.3521 99.5866 9.29187 98.0676 7.77282C96.5485 6.25378 94.4882 5.40039 92.34 5.40039ZM92.34 18.3604C91.3788 18.3604 90.4391 18.0754 89.6399 17.5413C88.8407 17.0073 88.2178 16.2483 87.8499 15.3602C87.4821 14.4722 87.3858 13.495 87.5734 12.5523C87.7609 11.6095 88.2238 10.7435 88.9034 10.0639C89.5831 9.38417 90.4491 8.9213 91.3919 8.73378C92.3346 8.54625 93.3118 8.64249 94.1998 9.01033C95.0879 9.37818 95.8469 10.0011 96.3809 10.8003C96.915 11.5995 97.2 12.5392 97.2 13.5004C97.2 14.7893 96.688 16.0255 95.7765 16.9369C94.8651 17.8484 93.6289 18.3604 92.34 18.3604V18.3604Z" fill="#1976D2" />
+                <path d="M80.8029 12.6472C81.2197 11.9079 81.4356 11.0724 81.4292 10.2237C81.4228 9.3751 81.1943 8.54293 80.7664 7.81002C80.3385 7.07712 79.7262 6.46904 78.9903 6.04629C78.2544 5.62353 77.4207 5.40085 76.572 5.40039H70.2V21.6004H78.192C79.242 21.5984 80.2632 21.2564 81.1025 20.6256C81.9419 19.9947 82.5545 19.109 82.8484 18.101C83.1424 17.093 83.102 16.0168 82.7332 15.0337C82.3645 14.0506 81.6873 13.2133 80.8029 12.6472V12.6472ZM73.44 8.64039H76.572C77.0017 8.64039 77.4137 8.81107 77.7175 9.11488C78.0213 9.41869 78.192 9.83074 78.192 10.2604C78.192 10.69 78.0213 11.1021 77.7175 11.4059C77.4137 11.7097 77.0017 11.8804 76.572 11.8804H73.44V8.64039ZM78.192 18.3604H73.44V15.1204H78.192C78.6217 15.1204 79.0337 15.2911 79.3375 15.5949C79.6413 15.8987 79.812 16.3107 79.812 16.7404C79.812 17.17 79.6413 17.5821 79.3375 17.8859C79.0337 18.1897 78.6217 18.3604 78.192 18.3604Z" fill="#1976D2" />
+                <path d="M60.21 5.40039C58.0617 5.40039 56.0015 6.25378 54.4824 7.77282C52.9634 9.29187 52.11 11.3521 52.11 13.5004C52.11 15.6486 52.9634 17.7089 54.4824 19.228C56.0015 20.747 58.0617 21.6004 60.21 21.6004C62.3582 21.6004 64.4185 20.747 65.9375 19.228C67.4566 17.7089 68.31 15.6486 68.31 13.5004C68.31 11.3521 67.4566 9.29187 65.9375 7.77282C64.4185 6.25378 62.3582 5.40039 60.21 5.40039ZM60.21 18.3604C59.2488 18.3604 58.3091 18.0754 57.5099 17.5413C56.7107 17.0073 56.0878 16.2483 55.7199 15.3602C55.3521 14.4722 55.2558 13.495 55.4434 12.5523C55.6309 11.6095 56.0938 10.7435 56.7734 10.0639C57.4531 9.38417 58.3191 8.9213 59.2618 8.73378C60.2046 8.54625 61.1818 8.64249 62.0698 9.01033C62.9579 9.37818 63.7169 10.0011 64.2509 10.8003C64.785 11.5995 65.07 12.5392 65.07 13.5004C65.07 14.7893 64.558 16.0255 63.6465 16.9369C62.7351 17.8484 61.4989 18.3604 60.21 18.3604V18.3604Z" fill="#1976D2" />
+                <path d="M143.081 11.9101L143.1 11.8804H139.32C138.89 11.8804 138.478 11.7097 138.174 11.4059C137.871 11.1021 137.7 10.69 137.7 10.2604C137.7 9.83074 137.871 9.41869 138.174 9.11488C138.478 8.81107 138.89 8.64039 139.32 8.64039H145.26L147.42 5.40039H139.32C138.079 5.40426 136.886 5.88284 135.987 6.73799C135.087 7.59313 134.549 8.76003 134.482 9.9994C134.415 11.2388 134.826 12.4567 135.628 13.4033C136.431 14.35 137.565 14.9537 138.799 15.0907L138.78 15.1204H142.56C142.99 15.1204 143.402 15.2911 143.705 15.5949C144.009 15.8987 144.18 16.3107 144.18 16.7404C144.18 17.17 144.009 17.5821 143.705 17.8859C143.402 18.1897 142.99 18.3604 142.56 18.3604H136.62L134.46 21.6004H142.56C143.801 21.5965 144.994 21.1179 145.893 20.2628C146.793 19.4077 147.331 18.2407 147.398 17.0014C147.464 15.762 147.054 14.5441 146.252 13.5974C145.449 12.6508 144.315 12.047 143.081 11.9101V11.9101Z" fill="#FF5722" />
+                <path d="M152.82 5.40039C151.579 5.40426 150.386 5.88284 149.487 6.73799C148.587 7.59313 148.049 8.76003 147.982 9.9994C147.915 11.2388 148.326 12.4567 149.128 13.4033C149.931 14.35 151.065 14.9537 152.299 15.0907L152.28 15.1204H156.06C156.49 15.1204 156.902 15.2911 157.205 15.5949C157.509 15.8987 157.68 16.3107 157.68 16.7404C157.68 17.17 157.509 17.5821 157.205 17.8859C156.902 18.1897 156.49 18.3604 156.06 18.3604H150.12L147.96 21.6004H156.06C157.301 21.5965 158.494 21.1179 159.393 20.2628C160.293 19.4077 160.831 18.2407 160.898 17.0014C160.964 15.762 160.554 14.5441 159.752 13.5974C158.949 12.6508 157.815 12.047 156.581 11.9101L156.6 11.8804H152.82C152.39 11.8804 151.978 11.7097 151.674 11.4059C151.371 11.1021 151.2 10.69 151.2 10.2604C151.2 9.83074 151.371 9.41869 151.674 9.11488C151.978 8.81107 152.39 8.64039 152.82 8.64039H158.76L160.92 5.40039H152.82Z" fill="#FF5722" />
+                <path d="M0 0V27H27L0 0Z" fill="#1565C0" />
+                <path d="M27 0H0V27L27 0Z" fill="#1976D2" />
+                <path d="M115.933 5.40039L109.31 12.4555L116.1 21.6004H112.32L107.152 14.7478L105.84 16.3165V21.6004H102.6V5.40039H105.84V11.7913L111.683 5.40039H115.933Z" fill="#FF5722" />
+                <path d="M41.04 21.6H37.8V5.39998H45.36C46.6949 5.38008 47.9846 5.88299 48.9537 6.80128C49.9554 7.75438 50.7438 9.14758 50.76 10.53C50.8195 11.7073 50.4339 12.8638 49.68 13.77C48.9186 14.7042 48.1545 15.4116 46.98 15.66L51.03 21.6H47.25L43.443 15.9948C43.3679 15.8911 43.2692 15.8067 43.1552 15.7485C43.0411 15.6903 42.9149 15.66 42.7869 15.66H41.04V21.6ZM41.04 12.69H45.36C45.9329 12.69 46.4823 12.4624 46.8873 12.0573C47.2924 11.6523 47.52 11.1029 47.52 10.53C47.52 9.95712 47.2924 9.40771 46.8873 9.00263C46.4823 8.59755 45.9329 8.36998 45.36 8.36998H41.04V12.69Z" fill="#1976D2" />
+            </svg>
+
+            <a href="https://www.robokassa.ru">About Robokassa</a>
+            <a href="https://www.robokassa.ru/ru/Contact.aspx">Feedback</a>
+        </div>
+    </div>
+
+    <input type="hidden" id="goBackStatus" value="We returning you..." name="goBackStatus" />
+    <input type="hidden" id="goBackFailed" value="Try again" name="goBackFailed" />
+    <input type="hidden" id="goToMarketRedirect" value="You will be redirected to the marketplace in {{redirectDelaySeconds}} seconds." name="goToMarketRedirect" />
+</body>
+</html>
+
+<script>
+    var redirectDelaySeconds = 10;
+
+    function goBack() {
+        var button = document.getElementById("backButton");
+        button.classList.add('disabled');
+        button.innerText = "We returning you...";
+        window.history.back();
+
+        setTimeout(function () { button.innerText = "Try again"; }, 2000);
+    }
+    /*function google() {
+        var button = document.getElementById("googleButton");
+        button.classList.add('disabled');
+        button.innerText = "Власти хотят изолировать интернет. Меняйте привычки...";
+    }*/
+    function goToMarket() {
+        var button = document.getElementById("marketButton");
+        button.classList.add('disabled');
+        var buttonText = "You will be redirected to the marketplace in {{redirectDelaySeconds}} seconds.";
+        button.innerText = buttonText.replace("{{redirectDelaySeconds}}", redirectDelaySeconds);
+        redirectDelaySeconds--;
+
+        foo = setInterval(time_dec, 1000);
+    }
+
+    var time_dec = function() {
+        var button = document.getElementById("marketButton");
+        var buttonText = "" + "You will be redirected to the marketplace in {{redirectDelaySeconds}} seconds.";
+        button.innerText = buttonText.replace("{{redirectDelaySeconds}}", redirectDelaySeconds);
+        redirectDelaySeconds--;
+        if (redirectDelaySeconds == -1) {
+            clearInterval(foo);
+            redirect();
+        }
+    }
+
+    function redirect() {
+        window.location.replace("https://robo.market");
+    }
+
+</script>
