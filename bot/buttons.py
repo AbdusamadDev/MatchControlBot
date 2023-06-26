@@ -42,4 +42,10 @@ change_team1 = InlineKeyboardMarkup().add(change)
 # def play_button_markup(data):
 play = InlineKeyboardButton(text="Присоеденится", callback_data="play")
 payed_button = InlineKeyboardMarkup(row_width=1).add(play, go_back)
+
+
 # return payed_button
+def p_and_j(callback_data):
+    var = InlineKeyboardButton("Не смогу придти", callback_data=f"absence:{callback_data}")
+    paid_and_joined_button = InlineKeyboardMarkup().add(var, go_back)
+    return paid_and_joined_button

@@ -218,11 +218,30 @@ async def change_team(callback: types.CallbackQuery, state: FSMContext):
     keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
     ras_keys = ["id", "date", "weekday", "address", "time", "max"]
     data = base.get(user_id=callback.from_user.id)
+    await_data = await state.get_data()
     if data is None:
         data = 0
-    if data > 0:
-        database.Model(user_id=int(callback.from_user.id), chance=int(data) + 1).update()
+    print(await_data)
     match_id = (await state.get_data()).get("match_id")
+
+    def is_paid_user():
+        user_match = get_data_from_id(
+            id=str(callback.from_user.id),
+            table_name="Матчи!A:I",
+            keys=keys,
+            key="user_id"
+        )
+        for i in user_match:
+            print(i)
+            if i.get("match_id") == str(match_id):
+                if i.get("pay") == "+":
+                    return True
+        return False
+
+    print(is_paid_user())
+    if is_paid_user():
+        database.Model(user_id=int(callback.from_user.id), chance=int(data) + 1).update()
+
     for index, some_data in enumerate(
             read_sheet_values(
                 table_name="Матчи!A:J",
@@ -351,28 +370,29 @@ async def get_expiry(message: types.Message, state: FSMContext):
     await message.answer(get_final_body_content(state_data.get("match_id")), reply_markup=buttons.change_team1)
     await state.finish()
     await state.update_data(match_id=state_data.get("match_id"))
+    await state.update_data(amount_of_game=state_data.get("amount_of_game"))
 
 
 @dp.message_handler(state=states.PaymentAmounts.amount_of_game)
 @dp.callback_query_handler(lambda c: c.data.startswith('per'))
 async def per_game(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(amount_of_game=1)
     await bot.send_message(
         callback.from_user.id,
         text="❓ Пожалуйста, введите идентификатор вашей карты:"
     )
     await states.PaymentDetails.card_id.set()
+    await state.update_data(amount_of_game=1)
 
 
 @dp.message_handler(state=states.PaymentAmounts.amount_of_game)
 @dp.callback_query_handler(lambda c: c.data.startswith('three'))
 async def three_games(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(amount_of_game=3)
     await bot.send_message(
         callback.from_user.id,
         text="❓ Пожалуйста, введите идентификатор вашей карты:"
     )
     await states.PaymentDetails.card_id.set()
+    await state.update_data(amount_of_game=3)
 
 
 @dp.message_handler(Command("start"))
@@ -498,29 +518,58 @@ async def process_callback_button(callback_query: types.CallbackQuery, state: FS
     await state.update_data(match_id=int(key_id))
 
     if is_regular_user():
+        print("User is joined to at least one match basically")
         base = database.Model()
+
+        is_payed = get_data_from_id(
+            id=str(callback_query.from_user.id),
+            table_name="Матчи!A:I",
+            keys=match_keys,
+            key="user_id"
+        )
+
+        def is_paid_user():
+            for i in is_payed:
+                if i.get("match_id") == str(key_id):
+                    if i.get("pay") == "+":
+                        return True
+            return False
+
+        print(is_paid_user())
         data = base.get(user_id=int(callback_query.from_user.id))
-        is_payed = not ((data is None) or (int(data) == 0))
         if not is_joined_before():
-            if is_payed:
+            print("User is not joined to match before")
+            if is_paid_user():
+                print("User is paid for match before")
                 await bot.send_message(
                     callback_query.from_user.id,
                     get_final_body_content(key_id),
                     reply_markup=buttons.payed_button
                 )
             else:
+                print("User is not paid for match before")
                 await bot.send_message(
                     callback_query.from_user.id,
                     get_final_body_content(key_id),
                     reply_markup=buttons.register_buttons
                 )
         else:
-            await bot.send_message(
-                callback_query.from_user.id,
-                get_final_body_content(key_id),
-                reply_markup=buttons.change_team(key_id)
-            )
+            if not is_paid_user():
+                print("User is not paid to match before")
+                await bot.send_message(
+                    callback_query.from_user.id,
+                    get_final_body_content(key_id),
+                    reply_markup=buttons.change_team(key_id)
+                )
+            else:
+                print("User is paid for match")
+                await bot.send_message(
+                    callback_query.from_user.id,
+                    get_final_body_content(key_id),
+                    reply_markup=buttons.p_and_j(key_id)
+                )
     else:
+        print("User is not joined any match yet")
         await bot.send_message(
             callback_query.from_user.id, mess, parse_mode="HTML", reply_markup=buttons.btn
         )
