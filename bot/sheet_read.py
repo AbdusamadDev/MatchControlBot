@@ -36,7 +36,3 @@ def normalize_data(data_value):
             list_of_buttons.append(per_button_text)
 
     return list_of_buttons
-
-
-if __name__ == '__main__':
-    print(read_sheet_values("Цены", keys=["status_id", "status", "discount", "price", "price_equals"]))

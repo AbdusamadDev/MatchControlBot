@@ -58,8 +58,3 @@ class Model:
             return user[0][0]
         return None
 
-
-if __name__ == '__main__':
-    m = Model(user_id=5122119678, chance=88)
-    # print(tuple(m.kwargs))
-    # print(m.update())

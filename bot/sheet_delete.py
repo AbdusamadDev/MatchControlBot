@@ -71,16 +71,9 @@ def delete_expired(table, keys):
     # try:
     row_index = 2  # Начальное значение номера строки
     for i in data:
-        print(unix(i.get("date"), i.get("time")) > 0)
         if unix(i.get("date"), i.get("time")) > 0:
-            print(i, row_index)
-            print(delete(table.split("!")[0], row_number=row_index))
+            delete(table.split("!")[0], row_number=row_index)
         else:
             row_index += 1
 
 
-if __name__ == '__main__':
-    # mkeys = ["match_id", "date", "weekday", "address", "time"]
-    # delete_expired("Расписание!A1:G", keys=mkeys)
-    # Example usage
-    print(subtract_from_current_date("10.06.23"))  # Subtract "29.06.23" from the current date

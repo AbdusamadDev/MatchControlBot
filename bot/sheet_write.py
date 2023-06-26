@@ -31,15 +31,3 @@ def write_registration(range_name: str, list_of_values: list):
         return 'Данные успешно записаны в таблицу.'
     except HttpError as err:
         return str(err)
-
-
-#
-if __name__ == '__main__':
-    for i in range(30):
-        write_registration(
-            "Матчи!A:J",
-            list_of_values=[
-                '28.06.23', '16:00', '4', '5122119678', 'ABDUSAMAD', 'https://t.me/ocean_devel', '+998940055565', '+'
-            ]
-        )
-

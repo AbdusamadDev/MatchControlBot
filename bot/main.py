@@ -377,7 +377,6 @@ async def three_games(callback: types.CallbackQuery, state: FSMContext):
 
 @dp.message_handler(Command("start"))
 async def start_command(message: types.Message):
-    print(message.chat.id)
     user_id = read_sheet_values(table_name="Пользователи!B:B", keys=["id"])
     if is_registered(user_id, tg_id=message.from_user.id):
         await message.answer(
