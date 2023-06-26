@@ -21,7 +21,7 @@ three = InlineKeyboardButton(text="За три игры", callback_data="three")
 per_or_three_button = InlineKeyboardMarkup(row_width=1).add(per, three)
 
 change = InlineKeyboardButton(
-    text="Перенести игру",
+    text="Изменить игру",
     callback_data="change_team"
 )
 
