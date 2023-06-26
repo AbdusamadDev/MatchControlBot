@@ -567,7 +567,7 @@ async def rules(callback_query: types.CallbackQuery, state: FSMContext):
         await bot.send_message(
             callback_query.from_user.id,
             get_final_body_content(key_id),
-            reply_markup=buttons.change_team(key_id)
+            reply_markup=buttons.register_buttons
         )
 
 
