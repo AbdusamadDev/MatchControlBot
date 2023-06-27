@@ -218,10 +218,8 @@ async def change_team(callback: types.CallbackQuery, state: FSMContext):
     keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
     ras_keys = ["id", "date", "weekday", "address", "time", "max"]
     data = base.get(user_id=callback.from_user.id)
-    await_data = await state.get_data()
     if data is None:
         data = 0
-    print(await_data)
     match_id = (await state.get_data()).get("match_id")
 
     def is_paid_user():
@@ -232,13 +230,10 @@ async def change_team(callback: types.CallbackQuery, state: FSMContext):
             key="user_id"
         )
         for i in user_match:
-            print(i)
             if i.get("match_id") == str(match_id):
                 if i.get("pay") == "+":
                     return True
         return False
-
-    print(is_paid_user())
     if is_paid_user():
         database.Model(user_id=int(callback.from_user.id), chance=int(data) + 1).update()
 
@@ -518,7 +513,6 @@ async def process_callback_button(callback_query: types.CallbackQuery, state: FS
     await state.update_data(match_id=int(key_id))
 
     if is_regular_user():
-        print("User is joined to at least one match basically")
         base = database.Model()
 
         is_payed = get_data_from_id(
@@ -535,19 +529,15 @@ async def process_callback_button(callback_query: types.CallbackQuery, state: FS
                         return True
             return False
 
-        print(is_paid_user())
         data = base.get(user_id=int(callback_query.from_user.id))
         if not is_joined_before():
-            print("User is not joined to match before")
             if is_paid_user():
-                print("User is paid for match before")
                 await bot.send_message(
                     callback_query.from_user.id,
                     get_final_body_content(key_id),
                     reply_markup=buttons.payed_button
                 )
             else:
-                print("User is not paid for match before")
                 await bot.send_message(
                     callback_query.from_user.id,
                     get_final_body_content(key_id),
@@ -555,21 +545,18 @@ async def process_callback_button(callback_query: types.CallbackQuery, state: FS
                 )
         else:
             if not is_paid_user():
-                print("User is not paid to match before")
                 await bot.send_message(
                     callback_query.from_user.id,
                     get_final_body_content(key_id),
                     reply_markup=buttons.change_team(key_id)
                 )
             else:
-                print("User is paid for match")
                 await bot.send_message(
                     callback_query.from_user.id,
                     get_final_body_content(key_id),
                     reply_markup=buttons.p_and_j(key_id)
                 )
     else:
-        print("User is not joined any match yet")
         await bot.send_message(
             callback_query.from_user.id, mess, parse_mode="HTML", reply_markup=buttons.btn
         )
