@@ -3,7 +3,6 @@ import asyncio
 import os
 from datetime import datetime
 
-from aiogram.dispatcher import filters
 from dotenv import load_dotenv
 import pytz
 from aiogram import Bot, Dispatcher, types, executor
@@ -14,10 +13,10 @@ from aiogram.dispatcher.filters import Command
 from sheet_delete import unix, delete_expired, delete, subtract_from_current_date
 import buttons
 import states
-import database
 from sheet_read import get_data_from_id, normalize_data, read_sheet_values
 from sheet_write import write_registration
-from sheet_update import update_registration
+
+# from sheet_update import update_registration
 
 load_dotenv()
 
@@ -128,6 +127,26 @@ dp = Dispatcher(bot, storage=storage)
 print("Bot started successfully")
 
 
+def user_chance(user_id):
+    pending_user = get_data_from_id(
+        id=str(user_id),
+        table_name="Оплата!A:C",
+        keys=["user_id", "chance"],
+        key="user_id"
+    )
+    if not pending_user:
+        return None
+    return int(pending_user[0].get("chance"))
+
+
+def is_paid(user_id):
+    return (user_chance(user_id) is not None) and user_chance(user_id) > 0
+
+
+def write_to_payment(user_id, chance):
+    write_registration(range_name="Оплата!A:C", list_of_values=[user_id, chance])
+
+
 @dp.message_handler(commands=["test"])
 async def button_url(message: types.Message):
     await message.answer("somethin", reply_markup=buttons.btn)
@@ -139,6 +158,82 @@ def is_correct_text(text):
 
 def is_registered(user: dict, tg_id: int):
     return any(str(u_id.get("id")) == str(tg_id) for u_id in user)
+
+
+# ------------------------------------------------------------------------------------------------ for team payment
+@dp.callback_query_handler(lambda c: c.data == "team_payment")
+async def team_payment(callback: types.CallbackQuery):
+    await bot.send_message(
+        callback.from_user.id,
+        text="Confirm or delete users?",
+        reply_markup=buttons.ask_delete_or_confirm
+    )
+
+
+@dp.message_handler(state=states.TeammatesLength.length)
+@dp.callback_query_handler(lambda c: c.data == "fake_delete")
+async def fake_delete(callback: types.CallbackQuery, state: FSMContext):
+    teammates = get_data_from_id(
+        id=str(callback.from_user.id),
+        table_name="Команда!A:C",
+        keys=["capitan_id", "user_fullname"],
+        key="capitan_id"
+    )
+    await state.update_data(length=teammates)
+    print("Length of users: ", len((await state.get_data()).get("length")))
+    b = []
+    for index, i in enumerate(teammates):
+        b.append(
+            buttons.InlineKeyboardButton(
+                text=str(i.get("user_fullname")),
+                callback_data="delete_user_from_match:{}".format(i.get("user_fullname"))
+            )
+        )
+    await bot.send_message(
+        callback.from_user.id,
+        "Choose who to make absent",
+        reply_markup=buttons.InlineKeyboardMarkup().add(*b)
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("delete_user_from_match:"))
+async def delete_final_thing(callback: types.CallbackQuery, state: FSMContext):
+    name = callback.data.split(":")[-1]
+    data = await state.get_data()
+    for index, d in enumerate(data.get("length")):
+        if str(d.get("user_fullname")) == str(name):
+            del data.get("length")[index]
+    await state.update_data(length=data.get("length"))
+    print(len(data.get("length")))
+    b = []
+    for index, i in enumerate(data.get("length")):
+        b.append(
+            buttons.InlineKeyboardButton(
+                text=str(i.get("user_fullname")),
+                callback_data="delete_user_from_match:{}".format(i.get("user_fullname"))
+            )
+        )
+    await bot.send_message(
+        callback.from_user.id,
+        "Choose who to make absent",
+        reply_markup=buttons.InlineKeyboardMarkup().add(*b, buttons.confirm)
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data == "confirm")
+async def calculate_and_confirm(callback: types.CallbackQuery, state: FSMContext):
+    # some_data = get_data_from_id(
+    #     id=str(callback.from_user.id),
+    #     table_name="Команда!A:C",
+    #     keys=["capital_id", "user_fullname"],
+    #     key="capital_id"
+    # )
+    # await state.update_data(length=some_data)
+    await bot.send_message(
+        callback.from_user.id,
+        text="Choose whether to pay for one game or three",
+        reply_markup=buttons.per_or_three_button
+    )
 
 
 # ------------------------------------------------------------------------------------------------ Oplatit igru button
@@ -176,7 +271,7 @@ async def pay_game(callback_query: types.CallbackQuery, state: FSMContext):
             await bot.send_message(
                 callback_query.from_user.id,
                 text="Выбор формата оплаты",
-                reply_markup=buttons.per_or_three_button
+                reply_markup=buttons.payment_format_buttons
             )
         else:
             await bot.send_message(callback_query.from_user.id, "🚫 вы уже присоединились к этой команде!")
@@ -187,55 +282,47 @@ async def pay_game(callback_query: types.CallbackQuery, state: FSMContext):
         )
 
 
-@dp.callback_query_handler(lambda c: c.data.startswith('only_me'))
-async def only_me(callback: types.CallbackQuery):
+@dp.callback_query_handler(lambda c: c.data.startswith('personal_payment'))
+async def only_me(callback: types.CallbackQuery, state: FSMContext):
     await bot.send_message(
         callback.from_user.id,
-        "ℹ️ Ты выбрал вариант `только меня`. Пожалуйста, введите идентификатор вашей карты:"
+        "Choose how many games you want?",
+        reply_markup=buttons.per_or_three_button
     )
-    await states.PaymentDetails.card_id.set()
+    await state.update_data(length=[])
+    # await states.PaymentDetails.card_id.set()
 
 
-@dp.message_handler(state=states.PaymentDetails.card_id)
-async def get_card_id(message: types.Message, state: FSMContext):
-    await state.update_data(card_id=message.text)
-    await message.answer("❓ Введите карту CVV/CVC:")
-    await states.PaymentDetails.CSV.set()
-
-
-@dp.message_handler(state=states.PaymentDetails.CSV)
-async def get_csv(message: types.Message, state: FSMContext):
-    await state.update_data(CSV=message.text)
-    await message.answer("❓ Введите срок действия карты:")
-    await states.PaymentDetails.expire_date.set()
+# @dp.message_handler(state=states.PaymentDetails.card_id)
+# async def get_card_id(message: types.Message, state: FSMContext):
+#     await state.update_data(card_id=message.text)
+#     await message.answer("❓ Введите карту CVV/CVC:")
+#     await states.PaymentDetails.CSV.set()
+#
+#
+# @dp.message_handler(state=states.PaymentDetails.CSV)
+# async def get_csv(message: types.Message, state: FSMContext):
+#     await state.update_data(CSV=message.text)
+#     await message.answer("❓ Введите срок действия карты:")
+#     await states.PaymentDetails.expire_date.set()
 
 
 # --------------------------------------------------------------------------------------------------------- change team
 # @dp.message_handler()
 @dp.callback_query_handler(lambda c: c.data.startswith('change_team'))
 async def change_team(callback: types.CallbackQuery, state: FSMContext):
-    base = database.Model()
+    # base = database.Model()
     keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
     ras_keys = ["id", "date", "weekday", "address", "time", "max"]
-    data = base.get(user_id=callback.from_user.id)
-    if data is None:
-        data = 0
+    # data = base.get(user_id=callback.from_user.id)
+    # if data is None:
+    #     data = 0
     match_id = (await state.get_data()).get("match_id")
 
-    def is_paid_user():
-        user_match = get_data_from_id(
-            id=str(callback.from_user.id),
-            table_name="Матчи!A:I",
-            keys=keys,
-            key="user_id"
-        )
-        for i in user_match:
-            if i.get("match_id") == str(match_id):
-                if i.get("pay") == "+":
-                    return True
-        return False
-    if is_paid_user():
-        database.Model(user_id=int(callback.from_user.id), chance=int(data) + 1).update()
+    chance = user_chance(callback.from_user.id)
+    if is_paid(callback.from_user.id):
+        write_to_payment(callback.from_user.id, chance + 1)
+        # database.Model(user_id=int(callback.from_user.id), chance=int(data) + 1).update()
 
     for index, some_data in enumerate(
             read_sheet_values(
@@ -256,7 +343,6 @@ async def change_team(callback: types.CallbackQuery, state: FSMContext):
                 callback_data=f"Example:{data_values[index]['id']}"
             )
         )
-        get_discount()
         dd += f"✅ {index + 1}.  " + text + "\n\n"
     b = buttons.InlineKeyboardMarkup().add(*b_list)
     await bot.send_message(
@@ -273,10 +359,113 @@ def get_discount():
     return discounts
 
 
-# -------------------------------------------------------------------------------------------------------
-@dp.message_handler(state=states.PaymentDetails.expire_date)
-async def get_expiry(message: types.Message, state: FSMContext):
-    await state.update_data(expire_date=message.text)
+@dp.message_handler(state=states.PaymentAmounts.amount_of_game)
+@dp.callback_query_handler(lambda c: c.data == 'per')
+async def per_game(callback: types.CallbackQuery, state: FSMContext):
+    # await states.PaymentDetails.card_id.set()
+    message = callback.message
+    await state.update_data(amount_of_game=1)
+    match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
+    state_data = await state.get_data()
+    regular_user = get_data_from_id(
+        table_name="Матчи!A:I",
+        id=str(callback.from_user.id),
+        keys=match_keys,
+        key="user_id"
+    )
+    print(regular_user)
+
+    def is_regular():
+        if not regular_user:
+            return False
+        print("Regular user: ", regular_user)
+        for k in regular_user:
+            print(k)
+            if subtract_from_current_date(k.get("date")) > 15:
+                return False
+        return True
+
+    if is_regular():
+        money_to_pay = int(get_discount()[0].get("regular_user"))
+    else:
+        money_to_pay = int(get_discount()[0].get("new_user"))
+
+    boolean = (await state.get_data()).get("length")
+    print("Length of boolean ", len(boolean))
+    if bool(boolean):
+        print("Boolean is worked")
+        m = money_to_pay
+        money_to_pay = (money_to_pay * len(boolean)) + m
+
+    print(state_data)
+    print("For per user: ", money_to_pay)
+    # Here, you should implement the payment processing using the card details stored in the state.
+    # And if the payment is successful, store the 3 bounces in the database.
+    # user = get_data_from_id(
+    #     id=str(message.from_user.id),
+    #     table_name="Пользователи!A:G",
+    #     keys=["date", "user_id", "fullname", "username", "phone", "region"],
+    #     key="user_id"
+    # )[0]
+    # del user["region"], user["date"]
+    # matches = read_sheet_values(
+    #     table_name="Матчи!A:G",
+    #     keys=match_keys,
+    # )
+    # date_keys = ["match_id", "data", "address", "date", "time", "max"]
+    # dates = get_data_from_id(
+    #     table_name="Расписание!A1:G",
+    #     id=str(state_data.get("match_id")),
+    #     keys=date_keys,
+    #     key="match_id"
+    # )[0]
+    # user = get_data_from_id(
+    #     id=str(message.from_user.id),
+    #     table_name="Пользователи!A:G",
+    #     keys=["date", "user_id", "fullname", "username", "phone", "region"],
+    #     key="user_id"
+    # )[0]
+    # del user["region"], user["date"]
+    # rem = list(user.values())
+    # final_data = list([dates.get("data"), dates.get("time"), dates.get("match_id")]) + rem + ["+"]
+    #
+    # def user_exists():
+    #     for j in matches:
+    #         if j.get("user_id") == str(message.from_user.id) and j.get("match_id") == str(state_data.get("match_id")):
+    #             return True
+    #
+    # if user_exists():
+    #     for index, i in enumerate(matches):
+    #         if str(i.get("match_id")) == str(state_data.get("match_id")) and str(i.get("user_id")) == str(
+    #                 message.from_user.id):
+    #             update_registration(range_name="Матчи", sign="+", row_index=index + 2)
+    # else:
+    #     write_registration("Матчи!A:G", list_of_values=final_data)
+    #
+    # if database.Model().get_user(int(message.from_user.id)) is None:
+    #     data = database.Model(
+    #         user_id=int(message.from_user.id),
+    #         chance=int(state_data.get("amount_of_game")) - 1
+    #     )
+    #     data.save()
+    # else:
+    #     data = database.Model(
+    #         user_id=int(message.from_user.id),
+    #         chance=int(state_data.get("amount_of_game")) - 1
+    #     )
+    #     data.update()
+    # await message.answer("✅ Ваш платеж прошел успешно! Теперь вы можете присоединиться к любой команде")
+    # await message.answer(get_final_body_content(state_data.get("match_id")), reply_markup=buttons.change_team1)
+    # await state.finish()
+    # await state.update_data(match_id=state_data.get("match_id"))
+    # await state.update_data(amount_of_game=state_data.get("amount_of_game"))
+
+
+@dp.message_handler(state=states.PaymentAmounts.amount_of_game)
+@dp.callback_query_handler(lambda c: c.data.startswith('three'))
+async def three_games(callback: types.CallbackQuery, state: FSMContext):
+    message = callback.message
+    await state.update_data(amount_of_game=3)
     match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
     state_data = await state.get_data()
     regular_user = get_data_from_id(
@@ -294,100 +483,79 @@ async def get_expiry(message: types.Message, state: FSMContext):
                 return False
         return True
 
-    money_to_pay = 0
-    if int(state_data.get("amount_of_game")) == 1:
-        if is_regular():
-            money_to_pay = int(get_discount()[0].get("regular_user"))
-        else:
-            money_to_pay = int(get_discount()[0].get("new_user"))
-    elif int(state_data.get("amount_of_game")) == 3:
-        if is_regular():
-            money_to_pay = int(get_discount()[0].get("regular_user")) * 3
-        else:
-            money_to_pay = int(get_discount()[0].get("new_user")) * 3
+    if is_regular():
+        money_to_pay = int(get_discount()[0].get("regular_user")) * 3
+    else:
+        money_to_pay = int(get_discount()[0].get("new_user")) * 3
+    boolean = (await state.get_data()).get("length")
+    print("Length of boolean ", len(boolean))
+    if bool(boolean):
+        print("Boolean is worked")
+        m = money_to_pay
+        money_to_pay = (money_to_pay * len(boolean)) + m
+
+    print(state_data)
+    print(money_to_pay)
     # Here, you should implement the payment processing using the card details stored in the state.
     # And if the payment is successful, store the 3 bounces in the database.
-    user = get_data_from_id(
-        id=str(message.from_user.id),
-        table_name="Пользователи!A:G",
-        keys=["date", "user_id", "fullname", "username", "phone", "region"],
-        key="user_id"
-    )[0]
-    del user["region"], user["date"]
-    matches = read_sheet_values(
-        table_name="Матчи!A:G",
-        keys=match_keys,
-    )
-    date_keys = ["match_id", "data", "address", "date", "time", "max"]
-    dates = get_data_from_id(
-        table_name="Расписание!A1:G",
-        id=str(state_data.get("match_id")),
-        keys=date_keys,
-        key="match_id"
-    )[0]
-    user = get_data_from_id(
-        id=str(message.from_user.id),
-        table_name="Пользователи!A:G",
-        keys=["date", "user_id", "fullname", "username", "phone", "region"],
-        key="user_id"
-    )[0]
-    del user["region"], user["date"]
-    rem = list(user.values())
-    final_data = list([dates.get("data"), dates.get("time"), dates.get("match_id")]) + rem + ["+"]
-
-    def user_exists():
-        for j in matches:
-            if j.get("user_id") == str(message.from_user.id) and j.get("match_id") == str(state_data.get("match_id")):
-                return True
-
-    if user_exists():
-        for index, i in enumerate(matches):
-            if str(i.get("match_id")) == str(state_data.get("match_id")) and str(i.get("user_id")) == str(
-                    message.from_user.id):
-                update_registration(range_name="Матчи", sign="+", row_index=index + 2)
-    else:
-        write_registration("Матчи!A:G", list_of_values=final_data)
-
-    await message.answer(str(money_to_pay))
-    if database.Model().get_user(int(message.from_user.id)) is None:
-        data = database.Model(
-            user_id=int(message.from_user.id),
-            chance=int(state_data.get("amount_of_game")) - 1
-        )
-        data.save()
-    else:
-        data = database.Model(
-            user_id=int(message.from_user.id),
-            chance=int(state_data.get("amount_of_game")) - 1
-        )
-        data.update()
-    await message.answer("✅ Ваш платеж прошел успешно! Теперь вы можете присоединиться к любой команде")
-    await message.answer(get_final_body_content(state_data.get("match_id")), reply_markup=buttons.change_team1)
-    await state.finish()
-    await state.update_data(match_id=state_data.get("match_id"))
-    await state.update_data(amount_of_game=state_data.get("amount_of_game"))
-
-
-@dp.message_handler(state=states.PaymentAmounts.amount_of_game)
-@dp.callback_query_handler(lambda c: c.data.startswith('per'))
-async def per_game(callback: types.CallbackQuery, state: FSMContext):
-    await bot.send_message(
-        callback.from_user.id,
-        text="❓ Пожалуйста, введите идентификатор вашей карты:"
-    )
-    await states.PaymentDetails.card_id.set()
-    await state.update_data(amount_of_game=1)
-
-
-@dp.message_handler(state=states.PaymentAmounts.amount_of_game)
-@dp.callback_query_handler(lambda c: c.data.startswith('three'))
-async def three_games(callback: types.CallbackQuery, state: FSMContext):
-    await bot.send_message(
-        callback.from_user.id,
-        text="❓ Пожалуйста, введите идентификатор вашей карты:"
-    )
-    await states.PaymentDetails.card_id.set()
-    await state.update_data(amount_of_game=3)
+    # user = get_data_from_id(
+    #     id=str(message.from_user.id),
+    #     table_name="Пользователи!A:G",
+    #     keys=["date", "user_id", "fullname", "username", "phone", "region"],
+    #     key="user_id"
+    # )[0]
+    # del user["region"], user["date"]
+    # matches = read_sheet_values(
+    #     table_name="Матчи!A:G",
+    #     keys=match_keys,
+    # )
+    # date_keys = ["match_id", "data", "address", "date", "time", "max"]
+    # dates = get_data_from_id(
+    #     table_name="Расписание!A1:G",
+    #     id=str(state_data.get("match_id")),
+    #     keys=date_keys,
+    #     key="match_id"
+    # )[0]
+    # user = get_data_from_id(
+    #     id=str(message.from_user.id),
+    #     table_name="Пользователи!A:G",
+    #     keys=["date", "user_id", "fullname", "username", "phone", "region"],
+    #     key="user_id"
+    # )[0]
+    # del user["region"], user["date"]
+    # rem = list(user.values())
+    # final_data = list([dates.get("data"), dates.get("time"), dates.get("match_id")]) + rem + ["+"]
+    #
+    # def user_exists():
+    #     for j in matches:
+    #         if j.get("user_id") == str(message.from_user.id) and j.get("match_id") == str(state_data.get("match_id")):
+    #             return True
+    #
+    # if user_exists():
+    #     for index, i in enumerate(matches):
+    #         if str(i.get("match_id")) == str(state_data.get("match_id")) and str(i.get("user_id")) == str(
+    #                 message.from_user.id):
+    #             update_registration(range_name="Матчи", sign="+", row_index=index + 2)
+    # else:
+    #     write_registration("Матчи!A:G", list_of_values=final_data)
+    #
+    # if database.Model().get_user(int(message.from_user.id)) is None:
+    #     data = database.Model(
+    #         user_id=int(message.from_user.id),
+    #         chance=int(state_data.get("amount_of_game")) - 1
+    #     )
+    #     data.save()
+    # else:
+    #     data = database.Model(
+    #         user_id=int(message.from_user.id),
+    #         chance=int(state_data.get("amount_of_game")) - 1
+    #     )
+    #     data.update()
+    # await message.answer("✅ Ваш платеж прошел успешно! Теперь вы можете присоединиться к любой команде")
+    # await message.answer(get_final_body_content(state_data.get("match_id")), reply_markup=buttons.change_team1)
+    # await state.finish()
+    # await state.update_data(match_id=state_data.get("match_id"))
+    # await state.update_data(amount_of_game=state_data.get("amount_of_game"))
 
 
 @dp.message_handler(Command("start"))
@@ -513,7 +681,7 @@ async def process_callback_button(callback_query: types.CallbackQuery, state: FS
     await state.update_data(match_id=int(key_id))
 
     if is_regular_user():
-        base = database.Model()
+        # base = database.Model()
 
         is_payed = get_data_from_id(
             id=str(callback_query.from_user.id),
@@ -529,7 +697,6 @@ async def process_callback_button(callback_query: types.CallbackQuery, state: FS
                         return True
             return False
 
-        data = base.get(user_id=int(callback_query.from_user.id))
         if not is_joined_before():
             if is_paid_user():
                 await bot.send_message(
@@ -564,11 +731,11 @@ async def process_callback_button(callback_query: types.CallbackQuery, state: FS
 
 @dp.callback_query_handler(lambda c: c.data.startswith("rule"))
 async def rules(callback_query: types.CallbackQuery, state: FSMContext):
-    base = database.Model()
+    # base = database.Model()
     key = await state.get_data()
     key_id = key.get("match_id")
-    data = base.get(user_id=int(callback_query.from_user.id))
-    is_payed = not ((data is None) or (int(data) == 0))
+    # data = base.get(user_id=int(callback_query.from_user.id))
+    # is_payed = not ((data is None) or (int(data) == 0))
     match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
 
     def is_joined_before():
@@ -586,7 +753,7 @@ async def rules(callback_query: types.CallbackQuery, state: FSMContext):
         return False
 
     if is_joined_before():
-        if is_payed:
+        if is_paid(callback_query.from_user.id):
             await bot.send_message(
                 callback_query.from_user.id,
                 get_final_body_content(key_id),
@@ -604,6 +771,9 @@ async def rules(callback_query: types.CallbackQuery, state: FSMContext):
             get_final_body_content(key_id),
             reply_markup=buttons.register_buttons
         )
+
+
+# ---------------------------------------------------------------------------------------------- Send users with design
 
 
 # ------------------------------------------------------------------------------------------------ go back button
@@ -638,8 +808,8 @@ async def basic_message(message: types.Message):
     keys = ["id", "date", "weekday", "address", "time", "max"]
     delete_expired(table="Расписание!A1:G", keys=keys)
     if message.text == "Записаться на игру":
-
         data_values = read_sheet_values(table_name="Расписание!A1:G", keys=keys)
+        print("Function started")
         b_list = []
         dd = "\n\n"
         for index, text in enumerate(normalize_data(data_values)):
@@ -649,6 +819,7 @@ async def basic_message(message: types.Message):
                     callback_data=f"Example:{data_values[index]['id']}"
                 )
             )
+            print(">>> ", text)
             dd += f"✅ {index + 1}.  " + text + "\n\n"
         b = buttons.InlineKeyboardMarkup().add(*b_list)
         await message.answer(
@@ -656,7 +827,7 @@ async def basic_message(message: types.Message):
                  "с более подробной информацией, такой как список участников и другое." + dd,
             reply_markup=b
         )
-    elif message.text == "Моя команда":
+    elif message.text == "Мои игры":
         team_user = get_data_from_id(
             id=str(message.from_user.id),
             table_name="Матчи!A:I",
@@ -671,6 +842,83 @@ async def basic_message(message: types.Message):
             await message.answer("ℹ️ Вы еще не присоединились ни к одной команде, давайте сделаем одну")
         for per_id in match_id_list:
             await message.answer(get_final_body_content(per_id), reply_markup=buttons.change_team(per_id))
+    elif message.text == "Моя команда":
+        teammates = get_data_from_id(
+            table_name="Команда!A1:D",
+            id=str(message.from_user.id),
+            keys=["capitan_id", "user_fullname"],
+            key="capitan_id"
+        )
+        designed_data = ""
+        for index, i in enumerate(teammates, start=1):
+            designed_data += f"👤 {index}. {i.get('user_fullname')}\n"
+        await message.answer(
+            text="Here are all users who is with you:\n\n" + designed_data,
+            reply_markup=buttons.cap_buttons
+        )
+
+
+# ----------------------------------------------------------------------------------------------------- add teammates
+@dp.callback_query_handler(lambda c: c.data == "add")
+async def add_teammate(callback: types.CallbackQuery):
+    await bot.send_message(
+        callback.from_user.id,
+        "Enter fullname of your fucking teammate",
+    )
+    await states.TeammateDetails.fullname.set()
+
+
+@dp.message_handler(state=states.TeammateDetails.fullname)
+async def register_teammate(message: types.Message, state: FSMContext):
+    await state.update_data(fullname=message.text)
+    full_name = (await state.get_data()).get("fullname")
+    write_registration(
+        range_name="Команда!A1:D",
+        list_of_values=[str(message.from_user.id), full_name]
+    )
+    await message.answer("Your teammate has been successfully added!")
+
+
+@dp.callback_query_handler(lambda c: c.data == "delete")
+async def delete_teammates(callback: types.CallbackQuery):
+    teammates = get_data_from_id(
+        table_name="Команда!A1:D",
+        id=str(callback.from_user.id),
+        keys=["capitan_id", "user_fullname"],
+        key="capitan_id"
+    )
+    designed_teammates = ""
+    b = []
+    for index, j in enumerate(teammates, start=1):
+        designed_teammates += f"{index}. {j.get('user_fullname')}\n"
+        b.append(
+            buttons.final_delete_button(
+                text=str(index),
+                call=str(j.get("user_fullname"))
+            )
+        )
+    indexed_buttons = buttons.InlineKeyboardMarkup().add(*b)
+    await bot.send_message(
+        callback.from_user.id,
+        "Here are teammates you wanna delete\n\n" + designed_teammates,
+        reply_markup=indexed_buttons
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("teammate:"))
+async def confirm_deleting_teammate(callback: types.CallbackQuery):
+    teammate_fullname = callback.data.split(":")[-1]
+    for index, team in enumerate(
+            read_sheet_values(
+                table_name="Команда!A1:C",
+                keys=["capitan_id", "user_fullname"]
+            ),
+            start=2
+    ):
+        if str(team.get("capitan_id")) == str(callback.from_user.id):
+            if str(team.get("user_fullname")) == str(teammate_fullname):
+                print(f"User and teammate found: {team.get('user_fullname')} and the row id is: {index}")
+                delete(row_number=index, sheet_name="Команда")
 
 
 # ------------------------------------------------------------------------------------------------ cancel button
@@ -710,8 +958,8 @@ async def delete_absent_user(callback: types.CallbackQuery):
 @dp.callback_query_handler(lambda c: c.data == 'play')
 async def play(callback: types.CallbackQuery, state: FSMContext):
     await bot.delete_message(chat_id=callback.from_user.id, message_id=callback.message.message_id)
-    chance = database.Model().get(user_id=int(callback.from_user.id))
-    database.Model(chance=int(chance) - 1, user_id=int(callback.from_user.id)).update()
+    # chance = database.Model().get(user_id=int(callback.from_user.id))
+    # database.Model(chance=int(chance) - 1, user_id=int(callback.from_user.id)).update()
     state_data = await state.get_data()
     # Here, you should implement the payment processing using the card details stored in the state.
     # And if the payment is successful, store the 3 bounces in the database.

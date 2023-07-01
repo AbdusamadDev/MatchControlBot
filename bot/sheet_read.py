@@ -36,3 +36,14 @@ def normalize_data(data_value):
             list_of_buttons.append(per_button_text)
 
     return list_of_buttons
+
+
+if __name__ == '__main__':
+    match_keys = ["date", "time", "match_id", "user_id", "fullname", "username", "phone", "pay"]
+    regular_user = get_data_from_id(
+        table_name="Матчи!A:I",
+        id="5122119678",
+        keys=match_keys,
+        key="user_id"
+    )
+    print(regular_user)

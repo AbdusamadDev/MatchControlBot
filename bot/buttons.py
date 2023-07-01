@@ -1,13 +1,59 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
-from aiogram.types.web_app_info import WebAppInfo
+from sheet_read import read_sheet_values
+from aiogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    ReplyKeyboardMarkup,
+    KeyboardButton
+)
 
 pay_game = InlineKeyboardButton("Оплатить игру", callback_data="pay_game")
 go_back = InlineKeyboardButton("Вернуться к списку матчей", callback_data="go_back")
 play_button = InlineKeyboardButton("Хочу играть", callback_data="play_button")
 
 but1 = KeyboardButton(text="Записаться на игру")
-but2 = KeyboardButton(text="Моя команда")
-two_buttons = ReplyKeyboardMarkup(resize_keyboard=True).add(but1, but2)
+but2 = KeyboardButton(text="Мои игры")
+but3 = KeyboardButton(text="Моя команда")
+two_buttons = ReplyKeyboardMarkup(resize_keyboard=True).add(but1, but2, but3)
+
+add = InlineKeyboardButton(text="Add teammates", callback_data="add")
+delete = InlineKeyboardButton(text="Delete teammates", callback_data="delete")
+cap_buttons = InlineKeyboardMarkup().add(add, delete)
+
+me_only_button = InlineKeyboardButton("For me only", callback_data="personal_payment")
+for_team_button = InlineKeyboardButton("For team payment", callback_data="team_payment")
+payment_format_buttons = InlineKeyboardMarkup().add(me_only_button, for_team_button)
+
+confirm = InlineKeyboardButton("Confirm and continue", callback_data="confirm")
+
+
+# confirm_button = InlineKeyboardMarkup().add(*list_of_buttons, confirm)
+
+
+def final_delete_button(text, call):
+    final_delete = InlineKeyboardButton(text=text, callback_data="teammate:" + str(call))
+    return final_delete
+
+
+def get_designed_user(keys):
+    users = read_sheet_values(
+        table_name="Пользователи!A1:G",
+        keys=keys
+    )
+    user_buttons = []
+    user_dec_data = ""
+    for index, user in enumerate(users, start=1):
+        user_dec_data += f"👤 {index}. {user.get('fullname')}\n"
+        user_buttons.append(
+            InlineKeyboardButton(
+                text=str(index),
+                callback_data=f"User:{index}"
+            )
+        )
+    return user_dec_data, user_buttons
+
+
+fake_delete = InlineKeyboardButton(text="Remove Users that are absent", callback_data="fake_delete")
+ask_delete_or_confirm = InlineKeyboardMarkup().add(fake_delete, confirm)
 
 
 def absence(callback_data):

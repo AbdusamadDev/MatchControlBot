@@ -8,12 +8,19 @@ class UserDetails(StatesGroup):
     match_id = State()
 
 
-class PaymentDetails(StatesGroup):
-    card_id = State()
-    CSV = State()
-    expire_date = State()
+# class PaymentDetails(StatesGroup):
+#     card_id = State()
+#     CSV = State()
+#     expire_date = State()
 
 
 class PaymentAmounts(StatesGroup):
     amount_of_game = State()
-    # team_or_one = State()
+
+
+class TeammateDetails(StatesGroup):
+    fullname = State()
+
+
+class TeammatesLength(StatesGroup):
+    length = State()
